@@ -1,0 +1,48 @@
+
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Connect Bank - ContextOS</title>
+                        <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+                        <style>
+                            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background-color: #f4f4f9; }
+                            .card { background: white; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; }
+                            button { padding: 15px 30px; font-size: 16px; cursor: pointer; background-color: #1C1C1C; color: white; border: none; border-radius: 5px; margin-top: 20px; }
+                            button:hover { background-color: #333; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="card">
+                            <h2>Connect Your Bank</h2>
+                            <p>Click the button below to securely connect your account via Plaid.</p>
+                            <button id="link-button">Open Bank Login</button>
+                            <p id="status" style="margin-top: 20px; color: #666;">Ready</p>
+                        </div>
+                        <script>
+                        var linkToken = 'link-production-859450f6-d2db-483c-b7a1-74cd84dcb4e9';
+                        var handler = Plaid.create({
+                          token: linkToken,
+                          onSuccess: function(public_token, metadata) {
+                            document.getElementById('status').innerText = "Success! Redirecting to ContextOS...";
+                            // Redirect back to Streamlit
+                            window.location.href = 'http://localhost:8502/?public_token=' + public_token;
+                          },
+                          onLoad: function() {
+                            document.getElementById('status').innerText = "Secure Connection Ready.";
+                          },
+                          onExit: function(err, metadata) {
+                            if (err != null) {
+                                document.getElementById('status').innerText = "Error: " + err.display_message;
+                            } else {
+                                document.getElementById('status').innerText = "Exited.";
+                            }
+                          },
+                        });
+                        
+                        document.getElementById('link-button').onclick = function() {
+                            handler.open();
+                        };
+                        </script>
+                    </body>
+                    </html>
+                    

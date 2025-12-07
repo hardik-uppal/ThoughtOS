@@ -1,0 +1,506 @@
+[
+  {
+    "id": "_7187gu3b70pjigi5e5rkam9matjn4d38ch740gr1dgn66rrd",
+    "summary": "Hiring Screening between OnDeck AI and Hardik Uppal",
+    "start": "13:00",
+    "end": "13:15",
+    "type": "event",
+    "recurringEventId": null
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251122T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251122T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "siqhn14p1v8gn1aoh1ltrneea4",
+    "summary": "MLS Cup Playoffs W Conf Semifinal: Whitecaps FC v LAFC",
+    "start": "2025-11-22",
+    "end": "2025-11-23",
+    "type": "event",
+    "recurringEventId": null
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251123T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251123T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251124T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251124T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251125T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251125T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "_clr78bbmapjmeta4f9mj2j9led1nari0clr6arjkecn6ot9edlgg",
+    "summary": "2025 Venture Showcase",
+    "start": "16:00",
+    "end": "19:30",
+    "type": "event",
+    "recurringEventId": null
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251126T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251127T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251127T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251128T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251128T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251129T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251129T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251130T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251130T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251201T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251201T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251202T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251202T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251203T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251203T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251204T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251204T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "e4diufa2u29dmkgmgt5v1o7s88",
+    "summary": "Looker's Product Roadmap for Trusted AI",
+    "start": "08:00",
+    "end": "09:00",
+    "type": "event",
+    "recurringEventId": null
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251205T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251205T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251206T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251206T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251207T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251207T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251208T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251208T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251209T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251209T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251210T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251210T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251211T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251211T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251212T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251212T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251213T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251213T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251214T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251214T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251215T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251215T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251216T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251216T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251217T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251217T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251218T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251218T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251219T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251219T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251220T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251220T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  },
+  {
+    "id": "21valeu24j8tturt654f3u6fdt_20251221T020000Z",
+    "summary": "gym",
+    "start": "18:00",
+    "end": "19:00",
+    "type": "event",
+    "recurringEventId": "21valeu24j8tturt654f3u6fdt"
+  },
+  {
+    "id": "1oen1s5dlopkqb7vfhk5a5k1kj_20251221T040000Z",
+    "summary": "second brain focus time",
+    "start": "20:00",
+    "end": "23:00",
+    "type": "event",
+    "recurringEventId": "1oen1s5dlopkqb7vfhk5a5k1kj"
+  }
+]

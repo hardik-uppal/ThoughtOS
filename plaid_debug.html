@@ -1,0 +1,43 @@
+
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Plaid Debug</title>
+        <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+        <style>
+            body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 50px; }
+            button { padding: 15px 30px; font-size: 16px; cursor: pointer; }
+            #status { margin-top: 20px; color: #333; }
+        </style>
+    </head>
+    <body>
+        <h1>Plaid Link Debugger</h1>
+        <button id="link-button">Open Plaid Link</button>
+        <p id="status">Status: Ready</p>
+        <pre id="output"></pre>
+
+        <script>
+        const linkHandler = Plaid.create({
+            token: 'link-production-8024f7a4-61b4-4f1b-b8cf-4aa7ae54ea07',
+            onSuccess: (public_token, metadata) => {
+                document.getElementById('status').innerText = 'Success!';
+                document.getElementById('output').innerText = 'Public Token: ' + public_token;
+            },
+            onLoad: () => {
+                document.getElementById('status').innerText = 'Plaid Loaded. Click button to open.';
+            },
+            onExit: (err, metadata) => {
+                document.getElementById('status').innerText = 'Exited';
+                if (err) {
+                    document.getElementById('output').innerText = JSON.stringify(err, null, 2);
+                }
+            },
+        });
+
+        document.getElementById('link-button').onclick = function() {
+            linkHandler.open();
+        };
+        </script>
+    </body>
+    </html>
+    
