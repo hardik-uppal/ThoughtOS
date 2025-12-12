@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks, Depends, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import sys
@@ -65,7 +65,7 @@ def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_current
         save_message(thread_id, 'user', request.message)
         
         # 4. Process
-        response = agent.process_input(request.message, request.image, context=context, history=history)
+        response = agent.process_input(request.message, user_id=user_id, image=request.image, context=context, history=history)
         
         # 5. Normalize response
         if isinstance(response, str):
@@ -80,6 +80,8 @@ def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_current
             "thread_id": thread_id
         }
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 class CloseThreadRequest(BaseModel):
@@ -168,26 +170,49 @@ def backfill_endpoint(req: BackfillRequest, background_tasks: BackgroundTasks):
     return {"status": "started", "message": f"Backfill started for {req.days} days."}
 
 @app.get("/api/context")
-def get_context_rail(current_user: dict = Depends(get_current_user)):
+def get_context_rail(background_tasks: BackgroundTasks, current_user: dict = Depends(get_current_user)):
     """
     Returns data for the Context Rail (Energy, Events, Tasks).
     """
     try:
         user_id = current_user['user_id']
-        # 1. Events & Energy
-        # We need a getter for events from DB, NOT fetch from Google API every time for context rail usually?
-        # The original code called fetch_google_calendar().
-        events = fetch_google_calendar(user_id) 
-        energy_level = calculate_daily_energy(events)
+        # 1. Events (Sync then Fetch from DB for reliability)
+        from logic.ingestion import fetch_google_calendar
+        from logic.sql_engine import get_events, get_thoughts, get_recent_activity
+        
+        # Trigger sync in background to avoid UI hang
+        background_tasks.add_task(fetch_google_calendar, user_id)
+
+            
+        # Create authoritative list from DB
+        # Filter for Today and Tomorrow only
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        tomorrow_end = (today_start + timedelta(days=2)).replace(microsecond=0)
+        
+        # We generally want upcoming events, so start from 'now' to avoid showing passed events from this morning
+        # But user might want to see what they missed today? 
+        # Requirement: "todays at max tommorow's events" - implying looking forward or whole day.
+        # "Upcoming" usually means future. Let's start from now.
+        
+        events = get_events(
+            user_id, 
+            limit=5, 
+            start_date=now.isoformat(), 
+            end_date=tomorrow_end.isoformat()
+        )
         
         # 2. Tasks
-        all_tasks = get_thoughts(user_id)
-        ranked_tasks = rank_tasks(all_tasks, energy_level)
+        tasks = get_thoughts(user_id)
+        
+        # 3. Recent Activity
+        recent_activity = get_recent_activity(user_id)
         
         return {
-            "energy_level": energy_level,
-            "events": events[:5] if isinstance(events, list) else [],
-            "tasks": ranked_tasks[:5] if ranked_tasks else []
+            "events": events[:10] if isinstance(events, list) else [],
+            "tasks": tasks[:10] if tasks else [],
+            "recent_activity": recent_activity
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -226,7 +251,6 @@ def causal_analysis_endpoint():
 # --- Auth Endpoints ---
 
 from integrations.plaid_api import create_link_token, exchange_public_token
-from integrations.calendar_api import authenticate_google
 from logic.data_store import save_plaid_token
 
 @app.get("/api/auth/plaid/link-token")
@@ -248,17 +272,6 @@ def plaid_exchange_endpoint(req: PlaidExchangeRequest):
         access_token = exchange_public_token(req.public_token)
         save_plaid_token(access_token)
         return {"status": "success", "message": "Plaid Connected"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/auth/google")
-def google_auth_endpoint():
-    try:
-        creds = authenticate_google()
-        if creds:
-            return {"status": "success", "message": "Google Calendar Connected"}
-        else:
-             raise HTTPException(status_code=400, detail="Auth failed")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -349,18 +362,69 @@ def submit_context_endpoint(req: ContextSubmitRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+# --- Graph Interaction Endpoints (NEW) ---
+
+class GraphAnalyzeRequest(BaseModel):
+    text: str
+
+@app.post("/api/graph/analyze")
+def graph_analyze_endpoint(req: GraphAnalyzeRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        from logic.graph_db import GraphManager
+        gm = GraphManager()
+        suggestions = gm.find_similar_nodes(req.text)
+        return {"suggestions": suggestions}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class GraphSaveRequest(BaseModel):
+    text: str
+    links: list[str] = []
+
+@app.post("/api/graph/save")
+def graph_save_endpoint(req: GraphSaveRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        from logic.graph_db import GraphManager
+        gm = GraphManager()
+        success = gm.create_thought(req.text, req.links)
+        return {"status": "success" if success else "error"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class GraphArchiveRequest(BaseModel):
+    text: str
+
+@app.post("/api/graph/archive")
+def graph_archive_endpoint(req: GraphArchiveRequest, current_user: dict = Depends(get_current_user)):
+    try:
+        from logic.graph_db import GraphManager
+        gm = GraphManager()
+        success = gm.create_archive(req.text)
+        return {"status": "success" if success else "error"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.get("/api/auth/status")
-def auth_status_endpoint():
-    # Check if we have tokens (Mock logic for now, checking if DB has data is a good proxy)
-    from logic.sql_engine import get_transactions, get_events
-    
-    has_plaid = len(get_transactions(limit=1)) > 0
-    has_google = len(get_events(limit=1)) > 0
-    
-    return {
-        "plaid": has_plaid,
-        "google": has_google
-    }
+def auth_status_endpoint(current_user: dict = Depends(get_current_user)):
+    try:
+        user_id = current_user['user_id']
+        from logic.sql_engine import get_transactions, get_user_token
+        
+        # Check Plaid (still proxying via transactions for now, or add token check if table exists)
+        # Assuming Plaid tokens are not in user_tokens yet? 
+        # logic/data_store.py says save_plaid_token saves to file json.
+        # So we keep Plaid check as is for now.
+        txns = get_transactions(user_id, limit=1)
+        
+        # Check Google (Proper check)
+        google_token = get_user_token(user_id)
+        
+        return {
+            "plaid": len(txns) > 0, # TODO: Migrate Plaid to DB tokens
+            "google": google_token is not None
+        }
+    except Exception as e:
+         raise HTTPException(status_code=500, detail=str(e))
 
 # --- Onboarding Endpoints ---
 

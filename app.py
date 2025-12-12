@@ -100,14 +100,16 @@ with st.sidebar:
     # Settings / Connect
     with st.expander("⚙️ Settings"):
         # Google Calendar
-        if st.button("Connect Google Calendar"):
-            from integrations.calendar_api import authenticate_google
-            creds = authenticate_google()
-            if creds:
-                st.success("Connected!")
-                st.rerun()
-            else:
-                st.error("credentials.json not found!")
+        if st.sidebar.button("Connect Google Calendar"):
+            st.sidebar.warning("Auth removed. Use Admin Panel.")
+            # from integrations.calendar_api import authenticate_google
+            # creds = authenticate_google()
+            # if creds:
+            #     st.sidebar.success("Connected!")
+            #     st.rerun()
+            # else:
+            #     st.sidebar.error("Failed.")
+            #     st.error("credentials.json not found!")
         
         # Plaid Link
         if st.button("Connect Bank Account"):

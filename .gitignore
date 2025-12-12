@@ -7,3 +7,4 @@ token.json
 *.log
 .DS_Store
 context_os.db
+data/

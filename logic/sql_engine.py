@@ -15,6 +15,21 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Table 5: user_tokens (OAuth Credentials)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_tokens (
+        user_id TEXT PRIMARY KEY,
+        provider TEXT,              -- "google"
+        access_token TEXT,
+        refresh_token TEXT,
+        token_uri TEXT,
+        client_id TEXT,
+        client_secret TEXT,
+        scopes TEXT,
+        expiry TEXT
+    );
+    """)
+
     # Table 1: master_transactions (Finance)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS master_transactions (
@@ -169,11 +184,35 @@ def init_db():
         'chat_threads'
     ]
     
+    # --- MIGRATION: Add user_id column ---
+    tables_to_migrate = [
+        'master_transactions', 
+        'master_events', 
+        'master_entries', 
+        'user_rules', 
+        'chat_threads'
+    ]
+    
     for table in tables_to_migrate:
         try:
             cursor.execute(f"ALTER TABLE {table} ADD COLUMN user_id TEXT")
         except sqlite3.OperationalError:
             pass # Column likely exists
+
+    # --- MIGRATION: Add user_tokens table (if not exists) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_tokens (
+        user_id TEXT PRIMARY KEY,
+        provider TEXT,
+        access_token TEXT,
+        refresh_token TEXT,
+        token_uri TEXT,
+        client_id TEXT,
+        client_secret TEXT,
+        scopes TEXT,
+        expiry TEXT
+    );
+    """)
 
     conn.commit()
     conn.close()
@@ -249,8 +288,8 @@ def upsert_event(user_id, event):
             event.get('id'),
             user_id,
             event.get('summary'),
-            event.get('start'),
-            event.get('end'),
+            event.get('start_iso'),
+            event.get('end_iso'),
             event.get('recurringEventId'),
             event.get('description'),
             json.dumps(event.get('attendees', [])),
@@ -325,9 +364,9 @@ def get_pending_enrichment():
     conn.close()
     return [dict(t) for t in txns], [dict(e) for e in events]
 
-def get_needs_user_review():
+def get_needs_user_review(user_id):
     """
-    Fetches rows that need User Review (NEEDS_USER).
+    Fetches rows that need User Review (NEEDS_USER) for a specific user.
     """
     conn = get_connection()
     conn.row_factory = sqlite3.Row
@@ -337,8 +376,8 @@ def get_needs_user_review():
                enrichment_status, clarification_question, suggested_tags,
                is_synced_to_graph, raw_payload
         FROM master_transactions 
-        WHERE enrichment_status = 'NEEDS_USER'
-    """).fetchall()
+        WHERE user_id = ? AND enrichment_status = 'NEEDS_USER'
+    """, (user_id,)).fetchall()
     
     conn.close()
     return [dict(t) for t in txns]
@@ -517,12 +556,27 @@ def get_transactions(user_id, limit=100):
     conn.close()
     return [dict(row) for row in rows]
 
-def get_events(user_id, limit=100):
-    """Fetches recent events."""
+def get_events(user_id, limit=100, start_date=None, end_date=None):
+    """Fetches recent events, optionally filtering by date range."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM master_events WHERE user_id = ? ORDER BY start_iso DESC LIMIT ?", (user_id, limit))
+    
+    query = "SELECT * FROM master_events WHERE user_id = ?"
+    params = [user_id]
+    
+    if start_date:
+        query += " AND start_iso >= ?"
+        params.append(start_date)
+        
+    if end_date:
+        query += " AND start_iso <= ?"
+        params.append(end_date)
+        
+    query += " ORDER BY start_iso ASC LIMIT ?"
+    params.append(limit)
+    
+    cursor.execute(query, tuple(params))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
@@ -598,3 +652,72 @@ def get_active_thread(user_id):
     ''', (user_id,)).fetchone()
     conn.close()
     return dict(thread)['thread_id'] if thread else None
+
+def store_user_token(user_id, creds_data):
+    """
+    Stores OAuth credentials for a user.
+    creds_data should be a dictionary with token fields.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR REPLACE INTO user_tokens 
+        (user_id, provider, access_token, refresh_token, token_uri, client_id, client_secret, scopes, expiry)
+        VALUES (?, 'google', ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        creds_data.get('token'),
+        creds_data.get('refresh_token'),
+        creds_data.get('token_uri'),
+        creds_data.get('client_id'),
+        creds_data.get('client_secret'),
+        json.dumps(creds_data.get('scopes', [])),
+        creds_data.get('expiry') # ISO string or timestamp
+    ))
+    conn.commit()
+    conn.close()
+
+def get_user_token(user_id):
+    """
+    Retrieves OAuth credentials for a user.
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    row = cursor.execute("SELECT * FROM user_tokens WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    if row:
+        data = dict(row)
+        if data['scopes']:
+            try:
+                data['scopes'] = json.loads(data['scopes'])
+            except:
+                data['scopes'] = []
+        return data
+    return None
+
+def get_recent_activity(user_id, limit=10):
+    """
+    Fetches a mixed stream of recent activity (Transactions, Events, Thoughts).
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    
+    # Transactions
+    txns = conn.execute(f"SELECT 'transaction' as type, txn_id as id, merchant_name as title, amount as subtitle, date_posted as timestamp FROM master_transactions WHERE user_id = ? ORDER BY date_posted DESC LIMIT {limit}", (user_id,)).fetchall()
+    
+    # Events
+    events = conn.execute(f"SELECT 'event' as type, event_id as id, summary as title, start_iso as subtitle, start_iso as timestamp FROM master_events WHERE user_id = ? ORDER BY start_iso DESC LIMIT {limit}", (user_id,)).fetchall()
+    
+    # Thoughts/Tasks
+    thoughts = conn.execute(f"SELECT 'task' as type, entry_id as id, content_text as title, 'Task' as subtitle, created_at as timestamp FROM master_entries WHERE user_id = ? ORDER BY created_at DESC LIMIT {limit}", (user_id,)).fetchall()
+    
+    conn.close()
+    
+    combined = [dict(row) for row in txns] + [dict(row) for row in events] + [dict(row) for row in thoughts]
+    
+    # Sort by timestamp desc
+    combined.sort(key=lambda x: x['timestamp'] or "", reverse=True)
+    
+    return combined[:limit]
+

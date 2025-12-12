@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import './Sidebar.css';
+import { Square, DollarSign, Calendar, Brain } from 'lucide-react';
 
 interface ContextData {
-    energy_level: string;
     events: any[];
     tasks: any[];
+    recent_activity: any[];
 }
 
 interface SidebarProps {
@@ -29,65 +31,55 @@ const Sidebar: React.FC<SidebarProps> = ({ onContextSelect, activeContext }) => 
         return () => clearInterval(interval);
     }, []);
 
-    if (!data) return <div style={{ padding: 20 }}>Loading Context...</div>;
-
-    const energyColor = data.energy_level === 'HIGH' ? '#34C759' : data.energy_level === 'MEDIUM' ? '#FF9500' : '#FF3B30';
+    if (!data) return (
+        <div className="sidebar" style={{ justifyContent: 'center', alignItems: 'center', opacity: 0.5 }}>
+            <div style={{ fontSize: '12px' }}>Updating Context...</div>
+        </div>
+    );
 
     const isActiveContext = (item: any, type: string) => {
         return activeContext && activeContext.id === item.id && activeContext.type === type;
     };
 
     return (
-        <div style={{
-            width: '250px',
-            borderRight: '1px solid #eee',
-            padding: '20px',
-            background: '#f9f9f9',
-            height: '100%',
-            overflowY: 'auto'
-        }}>
+        <div className="sidebar">
             <h3>Context Rail</h3>
 
-            {/* Energy Badge */}
-            <div style={{
-                padding: '12px',
-                background: 'white',
-                borderRadius: '12px',
-                marginBottom: '20px',
-                border: '1px solid #e0e0e0',
-                textAlign: 'center'
-            }}>
-                <div style={{ fontSize: '12px', color: '#666' }}>ENERGY LEVEL</div>
-                <div style={{ fontSize: '24px', fontWeight: 'bold', color: energyColor }}>
-                    {data.energy_level}
-                </div>
-            </div>
-
             {/* Events */}
-            <div style={{ marginBottom: '20px' }}>
-                <h4>📅 Upcoming</h4>
+            <div className="sidebar-section">
+                <h4>Upcoming Events</h4>
                 {data.events.length === 0 ? (
-                    <div style={{ fontSize: '14px', color: '#999' }}>No events</div>
+                    <div className="sidebar-empty">No upcoming events</div>
                 ) : (
                     data.events.map((e: any, idx: number) => {
                         const formatDateTime = (isoString: string) => {
                             if (!isoString) return 'All Day';
-                            const date = new Date(isoString);
-                            const today = new Date();
-                            const tomorrow = new Date(today);
-                            tomorrow.setDate(tomorrow.getDate() + 1);
+                            try {
+                                const date = new Date(isoString);
+                                if (isNaN(date.getTime())) return 'Invalid Date';
 
-                            let dateStr = '';
-                            if (date.toDateString() === today.toDateString()) {
-                                dateStr = 'Today';
-                            } else if (date.toDateString() === tomorrow.toDateString()) {
-                                dateStr = 'Tomorrow';
-                            } else {
-                                dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                const today = new Date();
+                                const tomorrow = new Date(today);
+                                tomorrow.setDate(tomorrow.getDate() + 1);
+
+                                let dateStr = '';
+                                if (date.toDateString() === today.toDateString()) {
+                                    dateStr = 'Today';
+                                } else if (date.toDateString() === tomorrow.toDateString()) {
+                                    dateStr = 'Tomorrow';
+                                } else {
+                                    dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                                }
+
+                                const timeStr = isoString.includes('T') ? minTime(date) : '';
+                                return timeStr ? `${dateStr} @ ${timeStr}` : dateStr;
+                            } catch (e) {
+                                return 'Invalid Date';
                             }
+                        };
 
-                            const timeStr = isoString.includes('T') ? isoString.split('T')[1].slice(0, 5) : '';
-                            return timeStr ? `${dateStr} ${timeStr}` : dateStr;
+                        const minTime = (d: Date) => {
+                            return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
                         };
 
                         const isActive = isActiveContext(e, 'event');
@@ -96,24 +88,12 @@ const Sidebar: React.FC<SidebarProps> = ({ onContextSelect, activeContext }) => 
                             <div
                                 key={idx}
                                 onClick={() => onContextSelect(e, 'event')}
-                                style={{
-                                    marginBottom: '8px',
-                                    fontSize: '13px',
-                                    padding: '8px',
-                                    background: isActive ? '#007AFF' : 'white',
-                                    color: isActive ? 'white' : 'inherit',
-                                    borderRadius: '6px',
-                                    border: isActive ? '2px solid #007AFF' : '1px solid #eee',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(el) => !isActive && (el.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)')}
-                                onMouseLeave={(el) => !isActive && (el.currentTarget.style.boxShadow = 'none')}
+                                className={`sidebar-item ${isActive ? 'active' : ''}`}
                             >
-                                <div style={{ fontWeight: 'bold', color: isActive ? 'white' : '#666', fontSize: '11px', marginBottom: '4px' }}>
+                                <div className="sidebar-item-header">
                                     {formatDateTime(e.start_iso)}
                                 </div>
-                                <div>{e.summary}</div>
+                                <div style={{ fontWeight: 500 }}>{e.summary}</div>
                             </div>
                         );
                     })
@@ -121,10 +101,10 @@ const Sidebar: React.FC<SidebarProps> = ({ onContextSelect, activeContext }) => 
             </div>
 
             {/* Tasks */}
-            <div>
-                <h4>✅ Smart Tasks</h4>
+            <div className="sidebar-section">
+                <h4>Smart Tasks</h4>
                 {data.tasks.length === 0 ? (
-                    <div style={{ fontSize: '14px', color: '#999' }}>No tasks</div>
+                    <div className="sidebar-empty">No pending tasks</div>
                 ) : (
                     data.tasks.map((t: any, idx: number) => {
                         const isActive = isActiveContext(t, 'task');
@@ -133,21 +113,33 @@ const Sidebar: React.FC<SidebarProps> = ({ onContextSelect, activeContext }) => 
                             <div
                                 key={idx}
                                 onClick={() => onContextSelect(t, 'task')}
-                                style={{
-                                    marginBottom: '8px',
-                                    fontSize: '14px',
-                                    padding: '8px',
-                                    background: isActive ? '#007AFF' : 'white',
-                                    color: isActive ? 'white' : 'inherit',
-                                    borderRadius: '6px',
-                                    border: isActive ? '2px solid #007AFF' : '1px solid #eee',
-                                    cursor: 'pointer',
-                                    transition: 'all 0.2s'
-                                }}
-                                onMouseEnter={(el) => !isActive && (el.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)')}
-                                onMouseLeave={(el) => !isActive && (el.currentTarget.style.boxShadow = 'none')}
+                                className={`sidebar-item ${isActive ? 'active' : ''}`}
                             >
-                                {t.content_text}
+                                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                                    <Square size={14} />
+                                    <span>{t.content_text}</span>
+                                </div>
+                            </div>
+                        );
+                    })
+                )}
+            </div>
+
+            {/* Recent Activity */}
+            <div className="sidebar-section">
+                <h4>Log Stream</h4>
+                {data.recent_activity.length === 0 ? (
+                    <div className="sidebar-empty">No recent activity</div>
+                ) : (
+                    data.recent_activity.map((item: any, idx: number) => {
+                        const icon = item.type === 'transaction' ? <DollarSign size={14} /> : item.type === 'event' ? <Calendar size={14} /> : <Brain size={14} />;
+                        return (
+                            <div key={idx} className="sidebar-activity-item">
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                    <span style={{ fontWeight: 'bold' }}>{icon}</span>
+                                    <div className="sidebar-activity-title">{item.title}</div>
+                                </div>
+                                {item.subtitle && <div style={{ fontSize: '11px', opacity: 0.7 }}>{item.subtitle}</div>}
                             </div>
                         );
                     })
@@ -155,15 +147,8 @@ const Sidebar: React.FC<SidebarProps> = ({ onContextSelect, activeContext }) => 
             </div>
 
             {/* Tip */}
-            <div style={{
-                marginTop: '20px',
-                padding: '12px',
-                background: '#fff3cd',
-                borderRadius: '8px',
-                fontSize: '12px',
-                border: '1px solid #ffc107'
-            }}>
-                💡 <strong>Tip:</strong> Click an event or task, then type notes in chat to link them!
+            <div className="tip-box">
+                &gt; <strong>TIP:</strong> Click an event or task to insert it into the context window.
             </div>
 
             {/* Sync Button */}
@@ -172,35 +157,26 @@ const Sidebar: React.FC<SidebarProps> = ({ onContextSelect, activeContext }) => 
                     onClick={async () => {
                         const btn = document.getElementById('sync-btn');
                         if (btn) {
-                            btn.innerText = 'Syncing...';
+                            btn.innerText = 'SYNCING...';
                             (btn as HTMLButtonElement).disabled = true;
                         }
                         try {
                             await axios.post('/api/sync');
-                            alert('Sync & Enrichment Complete!');
+                            alert('SYNC COMPLETE');
                         } catch (e) {
-                            alert('Sync failed');
+                            alert('SYNC FAILED');
                             console.error(e);
                         } finally {
                             if (btn) {
-                                btn.innerText = '🔄 Sync Data';
+                                btn.innerText = 'SYNC DATA';
                                 (btn as HTMLButtonElement).disabled = false;
                             }
                         }
                     }}
                     id="sync-btn"
-                    style={{
-                        width: '100%',
-                        padding: '10px',
-                        background: '#1C1C1C',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        fontWeight: 500
-                    }}
+                    className="sync-btn"
                 >
-                    🔄 Sync Data
+                    SYNC DATA
                 </button>
             </div>
         </div>
