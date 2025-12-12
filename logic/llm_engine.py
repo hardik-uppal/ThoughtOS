@@ -60,3 +60,33 @@ def get_embedding(text):
     except Exception as e:
         print(f"Embedding Error: {e}")
         return None
+
+def ask_gemini_vision_json(prompt, image_base64):
+    """
+    Multimodal request: Text + Image -> JSON.
+    """
+    if not model:
+        return "{}"
+
+    import base64
+    from io import BytesIO
+    from PIL import Image
+
+    try:
+        # Decode base64 to bytes
+        if "," in image_base64:
+            image_base64 = image_base64.split(",")[1]
+            
+        image_data = base64.b64decode(image_base64)
+        image = Image.open(BytesIO(image_data))
+        
+        json_prompt = f"{prompt}\n\nReturn valid JSON only. No markdown."
+        
+        response = model.generate_content([json_prompt, image])
+        
+        text = response.text
+        text = text.replace("```json", "").replace("```", "").strip()
+        return text
+    except Exception as e:
+        print(f"Vision Error: {e}")
+        raise e

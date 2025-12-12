@@ -5,7 +5,7 @@ class Agent:
     def __init__(self):
         self.name = "ContextOS Agent"
 
-    def process_input(self, user_input, image=None, context=None, history=None):
+    def process_input(self, user_input, user_id=None, image=None, context=None, history=None):
         """
         Intelligent Router:
         1. Check for enrichment queue (if no context and not a command)
@@ -17,8 +17,8 @@ class Agent:
         user_input_lower = user_input.lower()
 
         # 1. Check enrichment queue (conversational tagging)
-        if not context and not self._is_command(user_input_lower):
-            enrichment_question = self._check_enrichment_queue()
+        if not context and not self._is_command(user_input_lower) and user_id:
+            enrichment_question = self._check_enrichment_queue(user_id)
             if enrichment_question:
                 return enrichment_question
 
@@ -38,9 +38,9 @@ class Agent:
             # Include context in the query if present
             if context:
                 enriched_query = f"[Context: {context.get('summary') or context.get('content_text')}] {user_input}"
-                result = engine.process_query(enriched_query, history=history)
+                result = engine.process_query(enriched_query, history=history, image=image)
             else:
-                result = engine.process_query(user_input, history=history)
+                result = engine.process_query(user_input, history=history, image=image)
             
             # Result is now a dict { "text": "...", "widget": { ... } }
             response_payload = {
@@ -75,12 +75,12 @@ class Agent:
             return True
         return False
 
-    def _check_enrichment_queue(self):
-        """Check for pending enrichment items and return a question."""
+    def _check_enrichment_queue(self, user_id):
+        """Check for pending items and return a question."""
         from logic.sql_engine import get_needs_user_review
         import json
         
-        items = get_needs_user_review()
+        items = get_needs_user_review(user_id)
         
         if not items:
             return None

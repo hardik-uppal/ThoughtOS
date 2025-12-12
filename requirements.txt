@@ -11,3 +11,6 @@ neo4j
 fastapi
 uvicorn
 google-generativeai
+python-dotenv
+langgraph
+pydantic

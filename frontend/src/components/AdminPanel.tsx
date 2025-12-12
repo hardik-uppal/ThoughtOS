@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { usePlaidLink } from 'react-plaid-link';
+import { useGoogleLogin } from '@react-oauth/google';
 
 interface AdminPanelProps {
     isOpen: boolean;
@@ -13,12 +14,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
     const [reviewItems, setReviewItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [linkToken, setLinkToken] = useState<string | null>(null);
+    const [authStatus, setAuthStatus] = useState({ plaid: false, google: false });
 
     // --- Logs Logic ---
     const fetchLogs = async () => {
         try {
             const res = await axios.get('/api/logs');
             setLogs(res.data);
+
+            // Also fetch auth status
+            const authRes = await axios.get('/api/auth/status');
+            setAuthStatus(authRes.data);
         } catch (e) {
             console.error(e);
         }
@@ -106,6 +112,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                 await axios.post('/api/auth/plaid/exchange', { public_token });
                 alert("Plaid Connected Successfully!");
                 setLinkToken(null);
+                fetchLogs(); // Refresh status
             } catch (e) {
                 alert("Failed to connect Plaid");
             }
@@ -116,20 +123,26 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
         await initPlaidLink();
     };
 
+    const googleLogin = useGoogleLogin({
+        onSuccess: async (codeResponse) => {
+            try {
+                await axios.post('/api/auth/google/login', { code: codeResponse.code });
+                alert("Google Calendar Connected Successfully!");
+                fetchLogs(); // Refresh status
+            } catch (e) {
+                console.error(e);
+                alert("Failed to connect Google Calendar");
+            }
+        },
+        flow: 'auth-code',
+        scope: "https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid"
+    });
+
     useEffect(() => {
         if (linkToken && plaidReady) {
             openPlaidLink();
         }
     }, [linkToken, plaidReady, openPlaidLink]);
-
-    const handleGoogleAuth = async () => {
-        try {
-            await axios.post('/api/auth/google');
-            alert("Google Calendar Connected!");
-        } catch (e) {
-            alert("Google Calendar auth failed");
-        }
-    };
 
     useEffect(() => {
         if (isOpen) {
@@ -165,8 +178,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
             <div style={{
                 width: '900px',
                 height: '700px',
-                background: 'white',
-                borderRadius: '12px',
+                background: 'var(--bg-color)',
+                borderRadius: '0',
+                border: '1px solid var(--border-color)',
                 padding: '20px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -178,17 +192,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                 </div>
 
                 {/* Tabs */}
-                <div style={{ display: 'flex', borderBottom: '1px solid #eee', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', borderBottom: '1px solid var(--border-color)', marginBottom: '20px' }}>
                     <button
                         onClick={() => setActiveTab('logs')}
                         style={{
                             padding: '10px 20px',
                             background: 'none',
                             border: 'none',
-                            borderBottom: activeTab === 'logs' ? '2px solid #007AFF' : 'none',
-                            color: activeTab === 'logs' ? '#007AFF' : '#666',
-                            fontWeight: activeTab === 'logs' ? 'bold' : 'normal',
-                            cursor: 'pointer'
+                            borderBottom: activeTab === 'logs' ? '2px solid var(--text-color)' : 'none',
+                            color: 'var(--text-color)',
+                            fontWeight: activeTab === 'logs' ? '700' : '400',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            textTransform: 'uppercase'
                         }}
                     >
                         System Logs
@@ -199,131 +215,161 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
                             padding: '10px 20px',
                             background: 'none',
                             border: 'none',
-                            borderBottom: activeTab === 'curator' ? '2px solid #007AFF' : 'none',
-                            color: activeTab === 'curator' ? '#007AFF' : '#666',
-                            fontWeight: activeTab === 'curator' ? 'bold' : 'normal',
-                            cursor: 'pointer'
+                            borderBottom: activeTab === 'curator' ? '2px solid var(--text-color)' : 'none',
+                            color: 'var(--text-color)',
+                            fontWeight: activeTab === 'curator' ? '700' : '400',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            textTransform: 'uppercase'
                         }}
                     >
                         Curator (Review Queue)
                     </button>
                 </div>
 
-                {activeTab === 'logs' ? (
-                    <>
-                        {/* Auth Section */}
-                        <div style={{ marginBottom: '20px', padding: '16px', background: '#f9f9f9', borderRadius: '8px' }}>
-                            <h3 style={{ marginTop: 0 }}>🔐 Authentication</h3>
-                            <div style={{ display: 'flex', gap: '10px' }}>
-                                <button onClick={handlePlaidAuth} style={{ background: '#007AFF', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '6px', cursor: 'pointer' }}>
-                                    🏦 Connect Plaid
-                                </button>
-                                <button onClick={handleGoogleAuth} style={{ background: '#34C759', color: 'white', border: 'none', padding: '10px 16px', borderRadius: '6px', cursor: 'pointer' }}>
-                                    📅 Connect Google Calendar
+                {
+                    activeTab === 'logs' ? (
+                        <>
+                            {/* Auth Section */}
+                            <div style={{ marginBottom: '20px', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '0' }}>
+                                <h3 style={{ marginTop: 0, textTransform: 'uppercase', fontSize: '14px' }}>🔐 Authentication</h3>
+                                <div style={{ display: 'flex', gap: '10px' }}>
+                                    <button
+                                        onClick={handlePlaidAuth}
+                                        disabled={authStatus.plaid}
+                                        style={{
+                                            background: authStatus.plaid ? '#e0e0e0' : 'var(--text-color)',
+                                            color: authStatus.plaid ? '#888' : 'var(--bg-color)',
+                                            border: '1px solid var(--border-color)',
+                                            padding: '10px 16px',
+                                            borderRadius: '0',
+                                            cursor: authStatus.plaid ? 'default' : 'pointer',
+                                            fontFamily: 'inherit',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        {authStatus.plaid ? '✅ Plaid Connected' : '🏦 Connect Plaid'}
+                                    </button>
+                                    <button
+                                        onClick={() => googleLogin()}
+                                        disabled={authStatus.google}
+                                        style={{
+                                            background: authStatus.google ? '#e0e0e0' : 'var(--bg-color)',
+                                            color: authStatus.google ? '#888' : 'var(--text-color)',
+                                            border: '1px solid var(--border-color)',
+                                            padding: '10px 16px',
+                                            borderRadius: '0',
+                                            cursor: authStatus.google ? 'default' : 'pointer',
+                                            fontFamily: 'inherit',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        {authStatus.google ? '✅ Google Calendar Connected' : '📅 Connect Google Calendar'}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Actions Section */}
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                                <button onClick={fetchLogs} style={{ padding: '10px 16px', border: '1px solid var(--border-color)', background: 'var(--bg-color)', cursor: 'pointer', fontFamily: 'inherit' }}>🔄 Refresh</button>
+                                <button onClick={clearLogs} style={{ background: 'var(--bg-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '10px 16px', fontFamily: 'inherit' }}>🗑️ Clear Logs</button>
+                                <button onClick={runAnalysis} disabled={loading} style={{ background: 'var(--bg-color)', color: 'var(--text-color)', border: '1px solid var(--border-color)', cursor: 'pointer', padding: '10px 16px', fontFamily: 'inherit' }}>
+                                    {loading ? 'Running...' : '🕵️ Run Causal Analysis'}
                                 </button>
                             </div>
-                        </div>
 
-                        {/* Actions Section */}
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                            <button onClick={fetchLogs}>🔄 Refresh</button>
-                            <button onClick={clearLogs} style={{ background: '#FF3B30', color: 'white' }}>🗑️ Clear Logs</button>
-                            <button onClick={runAnalysis} disabled={loading} style={{ background: '#5856D6', color: 'white' }}>
-                                {loading ? 'Running...' : '🕵️ Run Causal Analysis'}
-                            </button>
-                        </div>
-
-                        {/* Logs Table */}
-                        <div style={{ flex: 1, overflowY: 'auto', border: '1px solid #eee', borderRadius: '8px' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
-                                <thead style={{ background: '#f5f5f5', position: 'sticky', top: 0 }}>
-                                    <tr>
-                                        <th style={{ padding: '8px', textAlign: 'left' }}>Time</th>
-                                        <th style={{ padding: '8px', textAlign: 'left' }}>Level</th>
-                                        <th style={{ padding: '8px', textAlign: 'left' }}>Component</th>
-                                        <th style={{ padding: '8px', textAlign: 'left' }}>Message</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {logs.map((log, idx) => (
-                                        <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                                            <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>{formatTimestamp(log.timestamp)}</td>
-                                            <td style={{ padding: '8px', color: log.level === 'ERROR' ? 'red' : 'black' }}>{log.level}</td>
-                                            <td style={{ padding: '8px' }}>{log.component}</td>
-                                            <td style={{ padding: '8px' }}>{log.message}</td>
+                            {/* Logs Table */}
+                            <div style={{ flex: 1, overflowY: 'auto', border: '1px solid var(--border-color)', borderRadius: '0' }}>
+                                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px', fontFamily: 'inherit' }}>
+                                    <thead style={{ background: '#f5f5f5', position: 'sticky', top: 0, borderBottom: '1px solid var(--border-color)' }}>
+                                        <tr>
+                                            <th style={{ padding: '8px', textAlign: 'left' }}>Time</th>
+                                            <th style={{ padding: '8px', textAlign: 'left' }}>Level</th>
+                                            <th style={{ padding: '8px', textAlign: 'left' }}>Component</th>
+                                            <th style={{ padding: '8px', textAlign: 'left' }}>Message</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        {/* Curator Actions */}
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                            <button onClick={runAutoTagger} disabled={loading} style={{ background: '#007AFF', color: 'white', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                                {loading ? 'Thinking...' : '🤖 Run Auto-Tagger'}
-                            </button>
-                            <button onClick={resetEnrichment} disabled={loading} style={{ background: '#FF9500', color: 'white', padding: '10px 16px', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
-                                ♻️ Reset All
-                            </button>
-                            <button onClick={fetchReviewItems} style={{ padding: '10px 16px', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer' }}>
-                                🔄 Refresh Queue
-                            </button>
-                        </div>
+                                    </thead>
+                                    <tbody>
+                                        {logs.map((log, idx) => (
+                                            <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
+                                                <td style={{ padding: '8px', whiteSpace: 'nowrap' }}>{formatTimestamp(log.timestamp)}</td>
+                                                <td style={{ padding: '8px', color: log.level === 'ERROR' ? 'red' : 'black' }}>{log.level}</td>
+                                                <td style={{ padding: '8px' }}>{log.component}</td>
+                                                <td style={{ padding: '8px' }}>{log.message}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            {/* Curator Actions */}
+                            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                                <button onClick={runAutoTagger} disabled={loading} style={{ background: 'var(--text-color)', color: 'var(--bg-color)', padding: '10px 16px', border: '1px solid var(--border-color)', borderRadius: '0', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 'bold' }}>
+                                    {loading ? 'Thinking...' : '🤖 Run Auto-Tagger'}
+                                </button>
+                                <button onClick={resetEnrichment} disabled={loading} style={{ background: 'var(--bg-color)', color: 'var(--text-color)', padding: '10px 16px', border: '1px solid var(--border-color)', borderRadius: '0', cursor: 'pointer', fontFamily: 'inherit' }}>
+                                    ♻️ Reset All
+                                </button>
+                                <button onClick={fetchReviewItems} style={{ padding: '10px 16px', border: '1px solid var(--border-color)', borderRadius: '0', cursor: 'pointer', background: 'var(--bg-color)', color: 'var(--text-color)', fontFamily: 'inherit' }}>
+                                    🔄 Refresh Queue
+                                </button>
+                            </div>
 
-                        {/* Review Queue */}
-                        <div style={{ flex: 1, overflowY: 'auto' }}>
-                            {reviewItems.length === 0 ? (
-                                <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
-                                    🎉 All caught up! No items need review.
-                                </div>
-                            ) : (
-                                reviewItems.map((item) => (
-                                    <div key={item.txn_id} style={{
-                                        border: '1px solid #eee',
-                                        borderRadius: '8px',
-                                        padding: '16px',
-                                        marginBottom: '12px',
-                                        display: 'flex',
-                                        justifyContent: 'space-between',
-                                        alignItems: 'center'
-                                    }}>
-                                        <div>
-                                            <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{item.merchant_name}</div>
-                                            <div style={{ color: '#666', fontSize: '14px' }}>
-                                                ${item.amount} • {item.date_posted}
-                                            </div>
-                                            <div style={{ marginTop: '8px', color: '#007AFF', fontSize: '14px' }}>
-                                                🤖 {item.clarification_question}
-                                            </div>
-                                        </div>
-                                        <div style={{ display: 'flex', gap: '8px' }}>
-                                            {JSON.parse(item.suggested_tags || '[]').map((tag: string) => (
-                                                <button
-                                                    key={tag}
-                                                    onClick={() => applyTag(item.txn_id, tag)}
-                                                    style={{
-                                                        padding: '8px 12px',
-                                                        background: '#f0f0f0',
-                                                        border: '1px solid #ddd',
-                                                        borderRadius: '20px',
-                                                        cursor: 'pointer',
-                                                        fontSize: '13px'
-                                                    }}
-                                                >
-                                                    {tag}
-                                                </button>
-                                            ))}
-                                        </div>
+                            {/* Review Queue */}
+                            <div style={{ flex: 1, overflowY: 'auto' }}>
+                                {reviewItems.length === 0 ? (
+                                    <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                                        🎉 All caught up! No items need review.
                                     </div>
-                                ))
-                            )}
-                        </div>
-                    </>
-                )}
-            </div>
-        </div>
+                                ) : (
+                                    reviewItems.map((item) => (
+                                        <div key={item.txn_id} style={{
+                                            border: '1px solid #eee',
+                                            borderRadius: '8px',
+                                            padding: '16px',
+                                            marginBottom: '12px',
+                                            display: 'flex',
+                                            justifyContent: 'space-between',
+                                            alignItems: 'center'
+                                        }}>
+                                            <div>
+                                                <div style={{ fontWeight: 'bold', fontSize: '16px' }}>{item.merchant_name}</div>
+                                                <div style={{ color: '#666', fontSize: '14px' }}>
+                                                    ${item.amount} • {item.date_posted}
+                                                </div>
+                                                <div style={{ marginTop: '8px', color: '#007AFF', fontSize: '14px' }}>
+                                                    🤖 {item.clarification_question}
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '8px' }}>
+                                                {JSON.parse(item.suggested_tags || '[]').map((tag: string) => (
+                                                    <button
+                                                        key={tag}
+                                                        onClick={() => applyTag(item.txn_id, tag)}
+                                                        style={{
+                                                            padding: '8px 12px',
+                                                            background: '#f0f0f0',
+                                                            border: '1px solid #ddd',
+                                                            borderRadius: '20px',
+                                                            cursor: 'pointer',
+                                                            fontSize: '13px'
+                                                        }}
+                                                    >
+                                                        {tag}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </>
+                    )
+                }
+            </div >
+        </div >
     );
 };
 

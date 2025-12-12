@@ -25,6 +25,7 @@ const WidgetRenderer: React.FC<WidgetRendererProps> = ({ type, data }) => {
 
         case 'bar_chart':
         case 'line_chart':
+        case 'pie_chart':
             return <ChartWidget data={data} />;
 
         case 'transaction_list':

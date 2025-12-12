@@ -43,29 +43,30 @@ class GraphManager:
             result = session.run(query, parameters)
             return [dict(record) for record in result]
 
-    def get_spending_by_category(self):
+    def get_spending_by_category(self, user_id):
         """
-        Aggregates spending by category.
+        Aggregates spending by category for a specific user.
         """
         query = """
         MATCH (t:Transaction)
-        WHERE t.amount > 0
+        WHERE t.user_id = $user_id AND t.amount > 0
         RETURN t.category as category, sum(t.amount) as total
         ORDER BY total DESC
         """
-        return self.run_cypher(query)
+        return self.run_cypher(query, {"user_id": user_id})
 
-    def get_top_merchants(self):
+    def get_top_merchants(self, user_id):
         """
-        Returns top merchants by transaction count and total spend.
+        Returns top merchants by transaction count and total spend for a specific user.
         """
         query = """
         MATCH (t:Transaction)-[:PAID_TO]->(m:Merchant)
+        WHERE t.user_id = $user_id
         RETURN m.name as merchant, count(t) as count, sum(t.amount) as total
         ORDER BY total DESC
         LIMIT 5
         """
-        return self.run_cypher(query)
+        return self.run_cypher(query, {"user_id": user_id})
 
     def verify_connection(self):
         if not self.driver:
@@ -140,4 +141,95 @@ class GraphManager:
             if emb:
                 self.query("MATCH (n:Event {id: $id}) SET n.embedding = $emb", {"id": e['id'], "emb": emb})
                 
+                
         print(f"Updated embeddings for {len(thoughts)} Thoughts and {len(events)} Events.")
+
+    def create_thought(self, content, links=None):
+        """
+        Creates a Thought node and links it to existing nodes.
+        """
+        if not self.driver: return False
+        
+        # 1. Create Thought Node
+        query_create = """
+        CREATE (t:Thought {
+            id: randomUUID(),
+            content: $content,
+            created_at: datetime(),
+            type: 'thought'
+        })
+        RETURN t.id as id
+        """
+        result = self.query(query_create, {"content": content})
+        if not result: return False
+        
+        thought_id = result[0]['id']
+        
+        # 2. Create Links
+        if links:
+            query_link = """
+            MATCH (t:Thought {id: $thought_id})
+            MATCH (n) WHERE n.id IN $links
+            MERGE (t)-[:RELATED_TO]->(n)
+            """
+            self.query(query_link, {"thought_id": thought_id, "links": links})
+            
+        # 3. Generate Embedding (Async ideally, but sync for now)
+        try:
+            from logic.llm_engine import get_embedding
+            emb = get_embedding(content)
+            if emb:
+                self.query("MATCH (n:Thought {id: $id}) SET n.embedding = $emb", {"id": thought_id, "emb": emb})
+        except Exception as e:
+            print(f"Failed to generate embedding for thought: {e}")
+            
+        return True
+
+    def create_archive(self, content):
+        """
+        Creates an Archive node (disconnected from graph context, but searchable).
+        """
+        if not self.driver: return False
+        
+        query_create = """
+        CREATE (a:Archive {
+            id: randomUUID(),
+            content: $content,
+            created_at: datetime(),
+            type: 'archive'
+        })
+        RETURN a.id as id
+        """
+        result = self.query(query_create, {"content": content})
+        return bool(result)
+
+    def find_similar_nodes(self, text, limit=5):
+        """
+        Vector search for similar nodes (Thoughts, Events, ChatThreads).
+        """
+        if not self.driver: return []
+        
+        try:
+            from logic.llm_engine import get_embedding
+            emb = get_embedding(text)
+            if not emb: return []
+            
+            # Search over multiple indices or just one generic if unified. 
+            # For now, let's search Thoughts and Events.
+            
+            # Simple approach: Union of searches (Neo4j < 5.x might not support multi-index vector search easily without UNION)
+            query = """
+            CALL db.index.vector.queryNodes('thought_embeddings', $limit, $emb)
+            YIELD node, score
+            RETURN node.id as id, node.content as name, 'Thought' as type, score as similarity
+            UNION
+            CALL db.index.vector.queryNodes('event_embeddings', $limit, $emb)
+            YIELD node, score
+            RETURN node.id as id, node.summary as name, 'Event' as type, score as similarity
+            ORDER BY similarity DESC
+            LIMIT $limit
+            """
+            return self.run_cypher(query, {"emb": emb, "limit": limit})
+        except Exception as e:
+            print(f"Vector search failed: {e}")
+            return []

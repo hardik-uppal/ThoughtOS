@@ -15,6 +15,21 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Table 5: user_tokens (OAuth Credentials)
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_tokens (
+        user_id TEXT PRIMARY KEY,
+        provider TEXT,              -- "google"
+        access_token TEXT,
+        refresh_token TEXT,
+        token_uri TEXT,
+        client_id TEXT,
+        client_secret TEXT,
+        scopes TEXT,
+        expiry TEXT
+    );
+    """)
+
     # Table 1: master_transactions (Finance)
     cursor.execute("""
     CREATE TABLE IF NOT EXISTS master_transactions (
@@ -160,10 +175,49 @@ def init_db():
         )
     ''')
 
+    # --- MIGRATION: Add user_id column ---
+    tables_to_migrate = [
+        'master_transactions', 
+        'master_events', 
+        'master_entries', 
+        'user_rules', 
+        'chat_threads'
+    ]
+    
+    # --- MIGRATION: Add user_id column ---
+    tables_to_migrate = [
+        'master_transactions', 
+        'master_events', 
+        'master_entries', 
+        'user_rules', 
+        'chat_threads'
+    ]
+    
+    for table in tables_to_migrate:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN user_id TEXT")
+        except sqlite3.OperationalError:
+            pass # Column likely exists
+
+    # --- MIGRATION: Add user_tokens table (if not exists) ---
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS user_tokens (
+        user_id TEXT PRIMARY KEY,
+        provider TEXT,
+        access_token TEXT,
+        refresh_token TEXT,
+        token_uri TEXT,
+        client_id TEXT,
+        client_secret TEXT,
+        scopes TEXT,
+        expiry TEXT
+    );
+    """)
+
     conn.commit()
     conn.close()
 
-def upsert_transaction(txn):
+def upsert_transaction(user_id, txn):
     """
     Idempotent insert for Plaid transactions.
     """
@@ -179,7 +233,7 @@ def upsert_transaction(txn):
         date = txn.get('date') or txn.get('date_posted')
         
         # Check for User Rules
-        rules = cursor.execute("SELECT pattern, category FROM user_rules").fetchall()
+        rules = cursor.execute("SELECT pattern, category FROM user_rules WHERE user_id = ?", (user_id,)).fetchall()
         
         final_category = category
         if isinstance(final_category, list):
@@ -192,14 +246,15 @@ def upsert_transaction(txn):
         
         cursor.execute("""
             INSERT INTO master_transactions 
-            (txn_id, merchant_name, amount, category, date_posted, raw_payload, enrichment_status)
-            VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
+            (txn_id, user_id, merchant_name, amount, category, date_posted, raw_payload, enrichment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
             ON CONFLICT(txn_id) DO UPDATE SET
                 amount=excluded.amount,
                 category=excluded.category,
                 raw_payload=excluded.raw_payload;
         """, (
             txn_id, 
+            user_id,
             merchant, 
             amount, 
             final_category, 
@@ -212,7 +267,7 @@ def upsert_transaction(txn):
     finally:
         conn.close()
 
-def upsert_event(event):
+def upsert_event(user_id, event):
     """
     Idempotent insert for Google Calendar events.
     """
@@ -222,8 +277,8 @@ def upsert_event(event):
     try:
         cursor.execute("""
             INSERT INTO master_events 
-            (event_id, summary, start_iso, end_iso, series_id, description, attendees, enrichment_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
+            (event_id, user_id, summary, start_iso, end_iso, series_id, description, attendees, enrichment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
             ON CONFLICT(event_id) DO UPDATE SET
                 summary=excluded.summary,
                 start_iso=excluded.start_iso,
@@ -231,9 +286,10 @@ def upsert_event(event):
                 description=excluded.description;
         """, (
             event.get('id'),
+            user_id,
             event.get('summary'),
-            event.get('start'),
-            event.get('end'),
+            event.get('start_iso'),
+            event.get('end_iso'),
             event.get('recurringEventId'),
             event.get('description'),
             json.dumps(event.get('attendees', [])),
@@ -308,9 +364,9 @@ def get_pending_enrichment():
     conn.close()
     return [dict(t) for t in txns], [dict(e) for e in events]
 
-def get_needs_user_review():
+def get_needs_user_review(user_id):
     """
-    Fetches rows that need User Review (NEEDS_USER).
+    Fetches rows that need User Review (NEEDS_USER) for a specific user.
     """
     conn = get_connection()
     conn.row_factory = sqlite3.Row
@@ -320,8 +376,8 @@ def get_needs_user_review():
                enrichment_status, clarification_question, suggested_tags,
                is_synced_to_graph, raw_payload
         FROM master_transactions 
-        WHERE enrichment_status = 'NEEDS_USER'
-    """).fetchall()
+        WHERE user_id = ? AND enrichment_status = 'NEEDS_USER'
+    """, (user_id,)).fetchall()
     
     conn.close()
     return [dict(t) for t in txns]
@@ -416,16 +472,16 @@ def clear_logs():
 
 # --- Onboarding / Rules Helpers ---
 
-def add_rule(pattern, category, threshold=None):
+def add_rule(user_id, pattern, category, threshold=None):
     """Adds a categorization rule."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
         # 1. Insert Rule
         cursor.execute('''
-            INSERT OR REPLACE INTO user_rules (pattern, category, threshold_limit, created_at)
-            VALUES (?, ?, ?, datetime('now'))
-        ''', (pattern, category, threshold))
+            INSERT OR REPLACE INTO user_rules (user_id, pattern, category, threshold_limit, created_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+        ''', (user_id, pattern, category, threshold))
         
         # 2. Apply Retroactively
         # Update all transactions where merchant_name contains pattern (case-insensitive)
@@ -433,8 +489,8 @@ def add_rule(pattern, category, threshold=None):
         cursor.execute('''
             UPDATE master_transactions
             SET category = ?, enrichment_status = 'COMPLETE'
-            WHERE lower(merchant_name) LIKE ? AND category != ?
-        ''', (category, f"%{pattern.lower()}%", category))
+            WHERE user_id = ? AND lower(merchant_name) LIKE ? AND category != ?
+        ''', (category, user_id, f"%{pattern.lower()}%", category))
         
         conn.commit()
         return True
@@ -444,11 +500,16 @@ def add_rule(pattern, category, threshold=None):
     finally:
         conn.close()
 
-def get_rules():
+def get_rules(user_id=None):
     """Fetches all user rules."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT pattern, category, threshold_limit FROM user_rules")
+    
+    if user_id:
+        cursor.execute("SELECT pattern, category, threshold_limit FROM user_rules WHERE user_id = ?", (user_id,))
+    else:
+        cursor.execute("SELECT pattern, category, threshold_limit FROM user_rules")
+        
     rules = [{"pattern": row[0], "category": row[1], "threshold": row[2]} for row in cursor.fetchall()]
     conn.close()
     return rules
@@ -473,50 +534,65 @@ def get_preference(key, default=None):
     conn.close()
     return row[0] if row else default
 
-def get_thoughts():
+def get_thoughts(user_id):
     """
     Fetches all thoughts/tasks from master_entries.
     """
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM master_entries WHERE entry_type = 'thought' ORDER BY created_at DESC")
+    cursor.execute("SELECT * FROM master_entries WHERE user_id = ? AND entry_type = 'thought' ORDER BY created_at DESC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def get_transactions(limit=100):
+def get_transactions(user_id, limit=100):
     """Fetches recent transactions."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM master_transactions ORDER BY date_posted DESC LIMIT ?", (limit,))
+    cursor.execute("SELECT * FROM master_transactions WHERE user_id = ? ORDER BY date_posted DESC LIMIT ?", (user_id, limit))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def get_events(limit=100):
-    """Fetches recent events."""
+def get_events(user_id, limit=100, start_date=None, end_date=None):
+    """Fetches recent events, optionally filtering by date range."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM master_events ORDER BY start_iso DESC LIMIT ?", (limit,))
+    
+    query = "SELECT * FROM master_events WHERE user_id = ?"
+    params = [user_id]
+    
+    if start_date:
+        query += " AND start_iso >= ?"
+        params.append(start_date)
+        
+    if end_date:
+        query += " AND start_iso <= ?"
+        params.append(end_date)
+        
+    query += " ORDER BY start_iso ASC LIMIT ?"
+    params.append(limit)
+    
+    cursor.execute(query, tuple(params))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
 # --- Chat Thread Helpers ---
 
-def create_thread():
+def create_thread(user_id):
     """Creates a new chat thread."""
     import uuid
     thread_id = str(uuid.uuid4())
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO chat_threads (thread_id, created_at, updated_at, is_active)
-        VALUES (?, datetime('now'), datetime('now'), 1)
-    ''', (thread_id,))
+        INSERT INTO chat_threads (thread_id, user_id, created_at, updated_at, is_active)
+        VALUES (?, ?, datetime('now'), datetime('now'), 1)
+    ''', (thread_id, user_id))
     conn.commit()
     conn.close()
     return thread_id
@@ -564,15 +640,84 @@ def update_thread_summary(thread_id, summary):
     conn.commit()
     conn.close()
 
-def get_active_thread():
-    """Gets the most recent active thread, if any."""
+def get_active_thread(user_id):
+    """Gets the most recent active thread for a user."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     thread = conn.execute('''
         SELECT thread_id FROM chat_threads 
-        WHERE is_active = 1 
+        WHERE user_id = ? AND is_active = 1 
         ORDER BY updated_at DESC 
         LIMIT 1
-    ''').fetchone()
+    ''', (user_id,)).fetchone()
     conn.close()
     return dict(thread)['thread_id'] if thread else None
+
+def store_user_token(user_id, creds_data):
+    """
+    Stores OAuth credentials for a user.
+    creds_data should be a dictionary with token fields.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT OR REPLACE INTO user_tokens 
+        (user_id, provider, access_token, refresh_token, token_uri, client_id, client_secret, scopes, expiry)
+        VALUES (?, 'google', ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        creds_data.get('token'),
+        creds_data.get('refresh_token'),
+        creds_data.get('token_uri'),
+        creds_data.get('client_id'),
+        creds_data.get('client_secret'),
+        json.dumps(creds_data.get('scopes', [])),
+        creds_data.get('expiry') # ISO string or timestamp
+    ))
+    conn.commit()
+    conn.close()
+
+def get_user_token(user_id):
+    """
+    Retrieves OAuth credentials for a user.
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    row = cursor.execute("SELECT * FROM user_tokens WHERE user_id = ?", (user_id,)).fetchone()
+    conn.close()
+    if row:
+        data = dict(row)
+        if data['scopes']:
+            try:
+                data['scopes'] = json.loads(data['scopes'])
+            except:
+                data['scopes'] = []
+        return data
+    return None
+
+def get_recent_activity(user_id, limit=10):
+    """
+    Fetches a mixed stream of recent activity (Transactions, Events, Thoughts).
+    """
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    
+    # Transactions
+    txns = conn.execute(f"SELECT 'transaction' as type, txn_id as id, merchant_name as title, amount as subtitle, date_posted as timestamp FROM master_transactions WHERE user_id = ? ORDER BY date_posted DESC LIMIT {limit}", (user_id,)).fetchall()
+    
+    # Events
+    events = conn.execute(f"SELECT 'event' as type, event_id as id, summary as title, start_iso as subtitle, start_iso as timestamp FROM master_events WHERE user_id = ? ORDER BY start_iso DESC LIMIT {limit}", (user_id,)).fetchall()
+    
+    # Thoughts/Tasks
+    thoughts = conn.execute(f"SELECT 'task' as type, entry_id as id, content_text as title, 'Task' as subtitle, created_at as timestamp FROM master_entries WHERE user_id = ? ORDER BY created_at DESC LIMIT {limit}", (user_id,)).fetchall()
+    
+    conn.close()
+    
+    combined = [dict(row) for row in txns] + [dict(row) for row in events] + [dict(row) for row in thoughts]
+    
+    # Sort by timestamp desc
+    combined.sort(key=lambda x: x['timestamp'] or "", reverse=True)
+    
+    return combined[:limit]
+

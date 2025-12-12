@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import { Save } from 'lucide-react';
 
 interface FormWidgetProps {
     data: {
@@ -100,17 +101,38 @@ const FormWidget: React.FC<FormWidgetProps> = ({ data, contextId, contextType })
                 disabled={submitting}
                 style={{
                     width: '100%',
-                    padding: '12px',
-                    background: '#007AFF',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontWeight: '600',
+                    padding: '12px 20px',
+                    background: 'var(--bg-color)',
+                    color: 'var(--text-color)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: '0',
+                    fontWeight: '700',
+                    fontSize: '14px',
                     cursor: submitting ? 'not-allowed' : 'pointer',
-                    opacity: submitting ? 0.6 : 1
+                    opacity: submitting ? 0.6 : 1,
+                    textTransform: 'uppercase',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontFamily: 'inherit',
+                    transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                    if (!submitting) {
+                        e.currentTarget.style.backgroundColor = 'var(--hover-bg)';
+                        e.currentTarget.style.color = 'var(--hover-text)';
+                    }
+                }}
+                onMouseLeave={(e) => {
+                    if (!submitting) {
+                        e.currentTarget.style.backgroundColor = 'var(--bg-color)';
+                        e.currentTarget.style.color = 'var(--text-color)';
+                    }
                 }}
             >
-                {submitting ? 'Saving...' : '💾 Save'}
+                <Save size={16} />
+                {submitting ? 'SAVING...' : 'SAVE ENTRY'}
             </button>
         </div>
     );
