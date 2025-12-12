@@ -6,5 +6,6 @@ credentials.json
 token.json
 *.log
 .DS_Store
-context_os.db
-data/client_secret.json
+*.db
+data/
+client_secret*.json
