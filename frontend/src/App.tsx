@@ -5,6 +5,7 @@ import WidgetRenderer from './components/WidgetRenderer'
 import Sidebar from './components/Sidebar'
 import AdminPanel from './components/AdminPanel'
 import OnboardingWizard from './components/Onboarding/OnboardingWizard'
+import Login from './components/Login'
 import { detectTemplateType, generateTemplate } from './utils/templates'
 import './App.css'
 
@@ -18,6 +19,7 @@ interface Message {
 }
 
 function App() {
+  const [user, setUser] = useState<any>(null);
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'ContextOS v3.0 Online. How can I help?' }
   ]);
@@ -35,8 +37,20 @@ function App() {
 
   useEffect(scrollToBottom, [messages]);
 
-  // Check Onboarding Status
+  // Setup Axios Interceptor
   useEffect(() => {
+    const interceptor = axios.interceptors.request.use(config => {
+      if (user?.credential) {
+        config.headers.Authorization = `Bearer ${user.credential}`;
+      }
+      return config;
+    });
+    return () => axios.interceptors.request.eject(interceptor);
+  }, [user]);
+
+  // Check Onboarding Status (Only if logged in)
+  useEffect(() => {
+    if (!user) return;
     const checkOnboarding = async () => {
       try {
         const res = await axios.get('/api/onboarding/status');
@@ -48,7 +62,7 @@ function App() {
       }
     };
     checkOnboarding();
-  }, []);
+  }, [user]);
 
   const handleContextSelect = (item: any, type: 'event' | 'task') => {
     const contextData = { ...item, type, id: item.id || item.event_id || item.entry_id };
@@ -124,13 +138,25 @@ function App() {
     setInput('');
   };
 
+  if (!user) {
+    return (
+      <Login
+        onSuccess={(credentialResponse) => setUser(credentialResponse)}
+        onError={() => alert('Login Failed')}
+      />
+    );
+  }
+
   return (
     <div className="app-container" style={{ flexDirection: 'row', maxWidth: '100%' }}>
       <Sidebar onContextSelect={handleContextSelect} activeContext={activeContext} />
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100vh', position: 'relative' }}>
         <header className="app-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1>ContextOS</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h1>ContextOS</h1>
+            <span style={{ fontSize: '12px', color: '#666' }}>{user.email || 'Logged In'}</span>
+          </div>
           <button
             onClick={() => setAdminOpen(true)}
             style={{

@@ -43,29 +43,30 @@ class GraphManager:
             result = session.run(query, parameters)
             return [dict(record) for record in result]
 
-    def get_spending_by_category(self):
+    def get_spending_by_category(self, user_id):
         """
-        Aggregates spending by category.
+        Aggregates spending by category for a specific user.
         """
         query = """
         MATCH (t:Transaction)
-        WHERE t.amount > 0
+        WHERE t.user_id = $user_id AND t.amount > 0
         RETURN t.category as category, sum(t.amount) as total
         ORDER BY total DESC
         """
-        return self.run_cypher(query)
+        return self.run_cypher(query, {"user_id": user_id})
 
-    def get_top_merchants(self):
+    def get_top_merchants(self, user_id):
         """
-        Returns top merchants by transaction count and total spend.
+        Returns top merchants by transaction count and total spend for a specific user.
         """
         query = """
         MATCH (t:Transaction)-[:PAID_TO]->(m:Merchant)
+        WHERE t.user_id = $user_id
         RETURN m.name as merchant, count(t) as count, sum(t.amount) as total
         ORDER BY total DESC
         LIMIT 5
         """
-        return self.run_cypher(query)
+        return self.run_cypher(query, {"user_id": user_id})
 
     def verify_connection(self):
         if not self.driver:

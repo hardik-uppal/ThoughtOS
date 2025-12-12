@@ -11,7 +11,8 @@ def sync_calendar_to_graph(graph_manager, events):
     SET e.summary = $summary,
         e.start = $start,
         e.end = $end,
-        e.recurringEventId = $recurringEventId
+        e.recurringEventId = $recurringEventId,
+        e.user_id = $user_id
     RETURN e
     """
     
@@ -21,7 +22,8 @@ def sync_calendar_to_graph(graph_manager, events):
             "summary": event.get("summary"),
             "start": event.get("start_iso") or event.get("start"),
             "end": event.get("end_iso") or event.get("end"),
-            "recurringEventId": event.get("series_id") or event.get("recurringEventId")
+            "recurringEventId": event.get("series_id") or event.get("recurringEventId"),
+            "user_id": event.get("user_id")
         }
         graph_manager.query(query, params)
         count += 1
@@ -36,7 +38,8 @@ def sync_transactions_to_graph(graph_manager, transactions):
     MERGE (t:Transaction {id: $id})
     SET t.amount = $amount,
         t.date = $date,
-        t.category = $category
+        t.category = $category,
+        t.user_id = $user_id
     
     MERGE (m:Merchant {name: $merchant})
     MERGE (t)-[:PAID_TO]->(m)
@@ -49,7 +52,8 @@ def sync_transactions_to_graph(graph_manager, transactions):
             "amount": txn.get("amount"),
             "date": txn.get("date_posted") or txn.get("date"),
             "category": txn.get("category"),
-            "merchant": txn.get("merchant_name") or txn.get("merchant")
+            "merchant": txn.get("merchant_name") or txn.get("merchant"),
+            "user_id": txn.get("user_id")
         }
         graph_manager.query(query, params)
         count += 1
@@ -63,19 +67,27 @@ def run_enrichment(graph_manager):
     links = em.link_temporal_context()
     return links
 
-def fetch_google_calendar():
+def fetch_google_calendar(user_id):
     """
     Fetches events from Google Calendar and persists them to SQLite.
     Returns the list of events.
     """
     from integrations.calendar_api import fetch_events
     from logic.sql_engine import upsert_event
+    from backend.auth import get_user_credentials
     
-    events = fetch_events()
+    # 1. Get credentials
+    creds = get_user_credentials(user_id)
+    if not creds:
+        print(f"No credentials found for user {user_id}")
+        return {"error": "No credentials found"}
+
+    # 2. Fetch events using credentials
+    events = fetch_events(creds=creds)
     
     if events and not isinstance(events, dict):
         for e in events:
-            upsert_event(e)
+            upsert_event(user_id, e)
             
     if isinstance(events, dict) and "error" in events:
         print(f"Calendar Error: {events['error']}")
@@ -83,7 +95,7 @@ def fetch_google_calendar():
         
     return events
 
-def sync_plaid_transactions():
+def sync_plaid_transactions(user_id):
     """
     Fetches transactions from Plaid and persists them to SQLite.
     """
@@ -91,15 +103,16 @@ def sync_plaid_transactions():
     from logic.sql_engine import upsert_transaction
     from logic.data_store import load_plaid_token
     
+    # TODO: Load token for specific user
     token = load_plaid_token()
     if token:
         txns = fetch_transactions(token)
         for t in txns:
-            upsert_transaction(t)
+            upsert_transaction(user_id, t)
         return txns
     return []
 
-def backfill_transactions(days=365):
+def backfill_transactions(user_id, days=365):
     """
     Backfills transactions for the specified number of days.
     """
@@ -107,6 +120,7 @@ def backfill_transactions(days=365):
     from logic.sql_engine import upsert_transaction, log_event
     from logic.data_store import load_plaid_token
     
+    # TODO: Load token for specific user
     token = load_plaid_token()
     if token:
         log_event("Backfill", f"Starting backfill for {days} days...", level="INFO")
@@ -114,7 +128,7 @@ def backfill_transactions(days=365):
             txns = fetch_transactions(token, days=days)
             log_event("Backfill", f"Fetched {len(txns)} transactions. Upserting...", level="INFO")
             for t in txns:
-                upsert_transaction(t)
+                upsert_transaction(user_id, t)
             log_event("Backfill", "Backfill complete.", level="SUCCESS")
             return len(txns)
         except Exception as e:

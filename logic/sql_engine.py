@@ -160,10 +160,25 @@ def init_db():
         )
     ''')
 
+    # --- MIGRATION: Add user_id column ---
+    tables_to_migrate = [
+        'master_transactions', 
+        'master_events', 
+        'master_entries', 
+        'user_rules', 
+        'chat_threads'
+    ]
+    
+    for table in tables_to_migrate:
+        try:
+            cursor.execute(f"ALTER TABLE {table} ADD COLUMN user_id TEXT")
+        except sqlite3.OperationalError:
+            pass # Column likely exists
+
     conn.commit()
     conn.close()
 
-def upsert_transaction(txn):
+def upsert_transaction(user_id, txn):
     """
     Idempotent insert for Plaid transactions.
     """
@@ -179,7 +194,7 @@ def upsert_transaction(txn):
         date = txn.get('date') or txn.get('date_posted')
         
         # Check for User Rules
-        rules = cursor.execute("SELECT pattern, category FROM user_rules").fetchall()
+        rules = cursor.execute("SELECT pattern, category FROM user_rules WHERE user_id = ?", (user_id,)).fetchall()
         
         final_category = category
         if isinstance(final_category, list):
@@ -192,14 +207,15 @@ def upsert_transaction(txn):
         
         cursor.execute("""
             INSERT INTO master_transactions 
-            (txn_id, merchant_name, amount, category, date_posted, raw_payload, enrichment_status)
-            VALUES (?, ?, ?, ?, ?, ?, 'PENDING')
+            (txn_id, user_id, merchant_name, amount, category, date_posted, raw_payload, enrichment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
             ON CONFLICT(txn_id) DO UPDATE SET
                 amount=excluded.amount,
                 category=excluded.category,
                 raw_payload=excluded.raw_payload;
         """, (
             txn_id, 
+            user_id,
             merchant, 
             amount, 
             final_category, 
@@ -212,7 +228,7 @@ def upsert_transaction(txn):
     finally:
         conn.close()
 
-def upsert_event(event):
+def upsert_event(user_id, event):
     """
     Idempotent insert for Google Calendar events.
     """
@@ -222,8 +238,8 @@ def upsert_event(event):
     try:
         cursor.execute("""
             INSERT INTO master_events 
-            (event_id, summary, start_iso, end_iso, series_id, description, attendees, enrichment_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING')
+            (event_id, user_id, summary, start_iso, end_iso, series_id, description, attendees, enrichment_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PENDING')
             ON CONFLICT(event_id) DO UPDATE SET
                 summary=excluded.summary,
                 start_iso=excluded.start_iso,
@@ -231,6 +247,7 @@ def upsert_event(event):
                 description=excluded.description;
         """, (
             event.get('id'),
+            user_id,
             event.get('summary'),
             event.get('start'),
             event.get('end'),
@@ -416,16 +433,16 @@ def clear_logs():
 
 # --- Onboarding / Rules Helpers ---
 
-def add_rule(pattern, category, threshold=None):
+def add_rule(user_id, pattern, category, threshold=None):
     """Adds a categorization rule."""
     conn = get_connection()
     cursor = conn.cursor()
     try:
         # 1. Insert Rule
         cursor.execute('''
-            INSERT OR REPLACE INTO user_rules (pattern, category, threshold_limit, created_at)
-            VALUES (?, ?, ?, datetime('now'))
-        ''', (pattern, category, threshold))
+            INSERT OR REPLACE INTO user_rules (user_id, pattern, category, threshold_limit, created_at)
+            VALUES (?, ?, ?, ?, datetime('now'))
+        ''', (user_id, pattern, category, threshold))
         
         # 2. Apply Retroactively
         # Update all transactions where merchant_name contains pattern (case-insensitive)
@@ -433,8 +450,8 @@ def add_rule(pattern, category, threshold=None):
         cursor.execute('''
             UPDATE master_transactions
             SET category = ?, enrichment_status = 'COMPLETE'
-            WHERE lower(merchant_name) LIKE ? AND category != ?
-        ''', (category, f"%{pattern.lower()}%", category))
+            WHERE user_id = ? AND lower(merchant_name) LIKE ? AND category != ?
+        ''', (category, user_id, f"%{pattern.lower()}%", category))
         
         conn.commit()
         return True
@@ -444,11 +461,16 @@ def add_rule(pattern, category, threshold=None):
     finally:
         conn.close()
 
-def get_rules():
+def get_rules(user_id=None):
     """Fetches all user rules."""
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT pattern, category, threshold_limit FROM user_rules")
+    
+    if user_id:
+        cursor.execute("SELECT pattern, category, threshold_limit FROM user_rules WHERE user_id = ?", (user_id,))
+    else:
+        cursor.execute("SELECT pattern, category, threshold_limit FROM user_rules")
+        
     rules = [{"pattern": row[0], "category": row[1], "threshold": row[2]} for row in cursor.fetchall()]
     conn.close()
     return rules
@@ -473,50 +495,50 @@ def get_preference(key, default=None):
     conn.close()
     return row[0] if row else default
 
-def get_thoughts():
+def get_thoughts(user_id):
     """
     Fetches all thoughts/tasks from master_entries.
     """
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM master_entries WHERE entry_type = 'thought' ORDER BY created_at DESC")
+    cursor.execute("SELECT * FROM master_entries WHERE user_id = ? AND entry_type = 'thought' ORDER BY created_at DESC", (user_id,))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def get_transactions(limit=100):
+def get_transactions(user_id, limit=100):
     """Fetches recent transactions."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM master_transactions ORDER BY date_posted DESC LIMIT ?", (limit,))
+    cursor.execute("SELECT * FROM master_transactions WHERE user_id = ? ORDER BY date_posted DESC LIMIT ?", (user_id, limit))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
-def get_events(limit=100):
+def get_events(user_id, limit=100):
     """Fetches recent events."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM master_events ORDER BY start_iso DESC LIMIT ?", (limit,))
+    cursor.execute("SELECT * FROM master_events WHERE user_id = ? ORDER BY start_iso DESC LIMIT ?", (user_id, limit))
     rows = cursor.fetchall()
     conn.close()
     return [dict(row) for row in rows]
 
 # --- Chat Thread Helpers ---
 
-def create_thread():
+def create_thread(user_id):
     """Creates a new chat thread."""
     import uuid
     thread_id = str(uuid.uuid4())
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO chat_threads (thread_id, created_at, updated_at, is_active)
-        VALUES (?, datetime('now'), datetime('now'), 1)
-    ''', (thread_id,))
+        INSERT INTO chat_threads (thread_id, user_id, created_at, updated_at, is_active)
+        VALUES (?, ?, datetime('now'), datetime('now'), 1)
+    ''', (thread_id, user_id))
     conn.commit()
     conn.close()
     return thread_id
@@ -564,15 +586,15 @@ def update_thread_summary(thread_id, summary):
     conn.commit()
     conn.close()
 
-def get_active_thread():
-    """Gets the most recent active thread, if any."""
+def get_active_thread(user_id):
+    """Gets the most recent active thread for a user."""
     conn = get_connection()
     conn.row_factory = sqlite3.Row
     thread = conn.execute('''
         SELECT thread_id FROM chat_threads 
-        WHERE is_active = 1 
+        WHERE user_id = ? AND is_active = 1 
         ORDER BY updated_at DESC 
         LIMIT 1
-    ''').fetchone()
+    ''', (user_id,)).fetchone()
     conn.close()
     return dict(thread)['thread_id'] if thread else None

@@ -42,12 +42,14 @@ def authenticate_google():
 
     return creds
 
-def fetch_events(days=30):
+def fetch_events(days=30, creds=None):
     """Fetches events from the primary calendar for the next N days."""
     try:
-        creds = authenticate_google()
         if not creds:
-            return {"error": "Missing credentials.json"}
+             creds = authenticate_google()
+        
+        if not creds:
+            return {"error": "Missing credentials.json or Token"}
         service = build('calendar', 'v3', credentials=creds)
 
         # Call the Calendar API
