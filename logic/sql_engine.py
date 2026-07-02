@@ -175,6 +175,74 @@ def init_db():
         )
     ''')
 
+    # ThoughtOS terminal/native note-taking tables
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS notes (
+            note_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            title TEXT,
+            note_type TEXT,
+            summary TEXT,
+            raw_text TEXT,
+            structured_payload JSON,
+            source TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_user_created ON notes(user_id, created_at DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_notes_type ON notes(note_type);")
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS tasks (
+            task_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            source_note_id TEXT,
+            title TEXT,
+            status TEXT DEFAULT 'open',
+            priority TEXT,
+            due_date TEXT,
+            owner TEXT,
+            project TEXT,
+            payload JSON,
+            created_at TEXT,
+            updated_at TEXT,
+            FOREIGN KEY(source_note_id) REFERENCES notes(note_id)
+        )
+    ''')
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_user_status ON tasks(user_id, status, created_at DESC);")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_tasks_source_note ON tasks(source_note_id);")
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS note_links (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id TEXT,
+            source_note_id TEXT,
+            target_type TEXT,
+            target_id TEXT,
+            relation TEXT,
+            created_at TEXT,
+            FOREIGN KEY(source_note_id) REFERENCES notes(note_id)
+        )
+    ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS vault_sources (
+            vault_id TEXT PRIMARY KEY,
+            user_id TEXT,
+            name TEXT,
+            provider TEXT DEFAULT 'google_drive',
+            remote_id TEXT,
+            local_path TEXT,
+            sync_direction TEXT DEFAULT 'bidirectional',
+            status TEXT DEFAULT 'configured',
+            metadata JSON,
+            created_at TEXT,
+            updated_at TEXT
+        )
+    ''')
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_vault_sources_user ON vault_sources(user_id);")
+
     # --- MIGRATION: Add user_id column ---
     tables_to_migrate = [
         'master_transactions', 
@@ -721,3 +789,146 @@ def get_recent_activity(user_id, limit=10):
     
     return combined[:limit]
 
+
+# --- ThoughtOS native notes/tasks helpers ---
+
+def create_note(note_id, user_id, title, note_type, summary, raw_text, structured_payload, source="api", created_at=None):
+    """Creates or updates a structured ThoughtOS note."""
+    import json
+    from datetime import datetime
+    created_at = created_at or datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO notes (note_id, user_id, title, note_type, summary, raw_text, structured_payload, source, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(note_id) DO UPDATE SET
+            title=excluded.title,
+            note_type=excluded.note_type,
+            summary=excluded.summary,
+            raw_text=excluded.raw_text,
+            structured_payload=excluded.structured_payload,
+            source=excluded.source,
+            updated_at=excluded.updated_at
+    ''', (note_id, user_id, title, note_type, summary, raw_text, json.dumps(structured_payload), source, created_at, created_at))
+    conn.commit()
+    row = cursor.execute("SELECT * FROM notes WHERE note_id = ?", (note_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+
+def create_task(task_id, user_id, source_note_id, title, status="open", priority=None, due_date=None, owner=None, project=None, payload=None, created_at=None):
+    """Creates or updates a ThoughtOS task."""
+    import json
+    from datetime import datetime
+    created_at = created_at or datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO tasks (task_id, user_id, source_note_id, title, status, priority, due_date, owner, project, payload, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(task_id) DO UPDATE SET
+            title=excluded.title,
+            status=excluded.status,
+            priority=excluded.priority,
+            due_date=excluded.due_date,
+            owner=excluded.owner,
+            project=excluded.project,
+            payload=excluded.payload,
+            updated_at=excluded.updated_at
+    ''', (task_id, user_id, source_note_id, title, status, priority, due_date, owner, project, json.dumps(payload or {}), created_at, created_at))
+    conn.commit()
+    row = cursor.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+
+def list_notes(user_id, limit=50, query=None, note_type=None):
+    """Lists recent notes, optionally filtered by text and type."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    sql = "SELECT * FROM notes WHERE user_id = ?"
+    params = [user_id]
+    if note_type:
+        sql += " AND note_type = ?"
+        params.append(note_type)
+    if query:
+        sql += " AND (title LIKE ? OR summary LIKE ? OR raw_text LIKE ?)"
+        like = f"%{query}%"
+        params.extend([like, like, like])
+    sql += " ORDER BY created_at DESC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, tuple(params)).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def list_tasks(user_id, status="open", limit=50, query=None):
+    """Lists tasks for a user."""
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    sql = "SELECT * FROM tasks WHERE user_id = ?"
+    params = [user_id]
+    if status and status != "all":
+        sql += " AND status = ?"
+        params.append(status)
+    if query:
+        sql += " AND (title LIKE ? OR project LIKE ?)"
+        like = f"%{query}%"
+        params.extend([like, like])
+    sql += " ORDER BY COALESCE(due_date, created_at) ASC LIMIT ?"
+    params.append(limit)
+    rows = conn.execute(sql, tuple(params)).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]
+
+
+def update_task_status(user_id, task_id, status):
+    """Updates a task status."""
+    from datetime import datetime
+    updated_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("UPDATE tasks SET status = ?, updated_at = ? WHERE user_id = ? AND task_id = ?", (status, updated_at, user_id, task_id))
+    conn.commit()
+    row = cursor.execute("SELECT * FROM tasks WHERE user_id = ? AND task_id = ?", (user_id, task_id)).fetchone()
+    conn.close()
+    return dict(row) if row else None
+
+
+def upsert_vault_source(user_id, name, remote_id=None, local_path=None, provider="google_drive", sync_direction="bidirectional", metadata=None, vault_id=None):
+    """Registers a vault source. Used for future multi-Google-Drive Obsidian sync."""
+    import json, uuid
+    from datetime import datetime
+    now = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+    vault_id = vault_id or str(uuid.uuid4())
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute('''
+        INSERT INTO vault_sources (vault_id, user_id, name, provider, remote_id, local_path, sync_direction, status, metadata, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, 'configured', ?, ?, ?)
+        ON CONFLICT(vault_id) DO UPDATE SET
+            name=excluded.name,
+            provider=excluded.provider,
+            remote_id=excluded.remote_id,
+            local_path=excluded.local_path,
+            sync_direction=excluded.sync_direction,
+            metadata=excluded.metadata,
+            updated_at=excluded.updated_at
+    ''', (vault_id, user_id, name, provider, remote_id, local_path, sync_direction, json.dumps(metadata or {}), now, now))
+    conn.commit()
+    row = cursor.execute("SELECT * FROM vault_sources WHERE vault_id = ?", (vault_id,)).fetchone()
+    conn.close()
+    return dict(row)
+
+
+def list_vault_sources(user_id):
+    conn = get_connection()
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("SELECT * FROM vault_sources WHERE user_id = ? ORDER BY name ASC", (user_id,)).fetchall()
+    conn.close()
+    return [dict(row) for row in rows]

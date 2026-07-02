@@ -6,6 +6,7 @@ interface LogoProps {
     speed?: number;
     delay?: number;
     loop?: boolean;
+    onSequenceComplete?: () => void;
 }
 
 const Logo: React.FC<LogoProps> = ({
@@ -13,7 +14,8 @@ const Logo: React.FC<LogoProps> = ({
     sequence = ["ThoughtOS"],
     speed = 100,
     delay = 2000,
-    loop = false
+    loop = false,
+    onSequenceComplete
 }) => {
     const [displayText, setDisplayText] = useState('');
     const [index, setIndex] = useState(0);

@@ -13,7 +13,7 @@ export default defineConfig(({ mode }) => {
     envPrefix: ['VITE_', 'GOOGLE_'],
     server: {
       host: true, // Listen on all addresses
-      allowedHosts: true, // Allow ngrok tunneling
+      allowedHosts: ['.ngrok-free.dev', '.ngrok.io', 'localhost'], // Allow ngrok tunneling
       proxy: {
         '/api': {
           target: env.VITE_API_URL || 'http://localhost:8000',

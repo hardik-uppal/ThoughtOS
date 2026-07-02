@@ -9,3 +9,4 @@ token.json
 *.db
 data/
 client_secret*.json
+*.egg-info/

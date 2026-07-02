@@ -12,8 +12,9 @@ from logic.ingestion import sync_plaid_transactions, fetch_google_calendar
 from logic.task_engine import calculate_daily_energy, rank_tasks
 from logic.task_engine import calculate_daily_energy, rank_tasks
 from logic.sql_engine import get_thoughts
-from backend.auth import get_current_user
+from backend.auth import get_current_user, verify_google_token
 from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 app = FastAPI(title="ContextOS API", version="3.0")
 
@@ -23,6 +24,36 @@ agent = Agent()
 # Initialize Database
 from logic.sql_engine import init_db
 init_db()
+
+optional_security = HTTPBearer(auto_error=False)
+
+async def get_current_user_or_local(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(optional_security),
+):
+    """Authenticate normal web users, while allowing loopback terminal tools.
+
+    Pi/OpenClaw terminal integrations can call local-only note endpoints without a
+    Google browser token when the request originates from localhost. Remote/LAN
+    callers must still use the normal Bearer token flow.
+    """
+    if credentials:
+        user_info = verify_google_token(credentials.credentials)
+        return {
+            "user_id": user_info["email"],
+            "email": user_info["email"],
+            "name": user_info.get("name", "Unknown"),
+        }
+
+    client_host = request.client.host if request.client else ""
+    if client_host in {"127.0.0.1", "::1", "localhost"}:
+        return {
+            "user_id": request.headers.get("X-ThoughtOS-User", "local@thoughtos"),
+            "email": request.headers.get("X-ThoughtOS-User", "local@thoughtos"),
+            "name": "Local Terminal",
+        }
+
+    raise HTTPException(status_code=401, detail="Authentication required")
 
 class ChatRequest(BaseModel):
     message: str
@@ -36,9 +67,94 @@ class ChatResponse(BaseModel):
     data: Optional[Dict[str, Any]] = None
     thread_id: Optional[str] = None
 
+class NoteIntakeRequest(BaseModel):
+    text: str
+    source: str = "api"
+    note_type: Optional[str] = "auto"
+    context: Optional[Dict[str, Any]] = None
+
+class TaskStatusRequest(BaseModel):
+    status: str
+
+class VaultSourceRequest(BaseModel):
+    name: str
+    remote_id: Optional[str] = None
+    local_path: Optional[str] = None
+    provider: str = "google_drive"
+    sync_direction: str = "bidirectional"
+    metadata: Optional[Dict[str, Any]] = None
+    vault_id: Optional[str] = None
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "system": "ContextOS v3.0"}
+
+@app.post("/api/notes/intake")
+def note_intake_endpoint(request: NoteIntakeRequest, current_user: dict = Depends(get_current_user_or_local)):
+    """Capture rough notes and turn them into structured notes + tasks."""
+    try:
+        from logic.note_intake import intake_note
+        return intake_note(
+            user_id=current_user["user_id"],
+            text=request.text,
+            source=request.source,
+            note_type=request.note_type,
+            context=request.context,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/notes")
+def notes_list_endpoint(
+    limit: int = 50,
+    query: Optional[str] = None,
+    note_type: Optional[str] = None,
+    current_user: dict = Depends(get_current_user_or_local),
+):
+    from logic.sql_engine import list_notes
+    return {"notes": list_notes(current_user["user_id"], limit=limit, query=query, note_type=note_type)}
+
+@app.get("/api/tasks")
+def tasks_list_endpoint(
+    status: str = "open",
+    limit: int = 50,
+    query: Optional[str] = None,
+    current_user: dict = Depends(get_current_user_or_local),
+):
+    from logic.sql_engine import list_tasks
+    return {"tasks": list_tasks(current_user["user_id"], status=status, limit=limit, query=query)}
+
+@app.patch("/api/tasks/{task_id}")
+def task_status_endpoint(task_id: str, request: TaskStatusRequest, current_user: dict = Depends(get_current_user_or_local)):
+    from logic.sql_engine import update_task_status
+    task = update_task_status(current_user["user_id"], task_id, request.status)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+    return {"task": task}
+
+@app.post("/api/vault-sources")
+def vault_source_upsert_endpoint(request: VaultSourceRequest, current_user: dict = Depends(get_current_user_or_local)):
+    """Register an Obsidian vault source for future multi-Google-Drive sync."""
+    from logic.sql_engine import upsert_vault_source
+    return {"vault": upsert_vault_source(
+        user_id=current_user["user_id"],
+        name=request.name,
+        remote_id=request.remote_id,
+        local_path=request.local_path,
+        provider=request.provider,
+        sync_direction=request.sync_direction,
+        metadata=request.metadata,
+        vault_id=request.vault_id,
+    )}
+
+@app.get("/api/vault-sources")
+def vault_source_list_endpoint(current_user: dict = Depends(get_current_user_or_local)):
+    from logic.sql_engine import list_vault_sources
+    return {"vaults": list_vault_sources(current_user["user_id"])}
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat_endpoint(request: ChatRequest, current_user: dict = Depends(get_current_user)):
@@ -217,7 +333,130 @@ def get_context_rail(background_tasks: BackgroundTasks, current_user: dict = Dep
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# --- Admin Endpoints ---
+# --- Notification Endpoints (NEW) ---
+
+from logic.notifications import get_pending_notifications, dismiss_notification
+
+@app.get("/api/notifications")
+def notifications_endpoint(current_user: dict = Depends(get_current_user)):
+    """Get ranked notifications for the header bar."""
+    try:
+        user_id = current_user['user_id']
+        notifications = get_pending_notifications(user_id)
+        return {"notifications": notifications}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class DismissNotificationRequest(BaseModel):
+    notification_id: str
+
+@app.post("/api/notifications/dismiss")
+def dismiss_notification_endpoint(req: DismissNotificationRequest, current_user: dict = Depends(get_current_user)):
+    """Dismiss/snooze a notification."""
+    try:
+        user_id = current_user['user_id']
+        success = dismiss_notification(req.notification_id, user_id)
+        return {"status": "success" if success else "error"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Context API Endpoints (NEW) ---
+
+@app.get("/api/context/available")
+def context_available_endpoint(current_user: dict = Depends(get_current_user)):
+    """List events and tasks that can be set as context."""
+    try:
+        user_id = current_user['user_id']
+        from logic.sql_engine import get_events, get_thoughts
+        from datetime import datetime, timedelta
+        
+        now = datetime.now()
+        tomorrow_end = (now + timedelta(days=2)).replace(hour=23, minute=59)
+        
+        events = get_events(user_id, limit=10, start_date=now.isoformat(), end_date=tomorrow_end.isoformat())
+        tasks = get_thoughts(user_id)
+        
+        return {
+            "events": [{"id": e['event_id'], "type": "event", "summary": e['summary'], "start": e.get('start_iso')} for e in (events or [])],
+            "tasks": [{"id": t['entry_id'], "type": "task", "summary": t['content_text']} for t in (tasks or [])]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class SetContextRequest(BaseModel):
+    context_id: str
+    context_type: str  # 'event' | 'task' | 'enrichment'
+
+@app.post("/api/context/set")
+def set_context_endpoint(req: SetContextRequest, current_user: dict = Depends(get_current_user)):
+    """Set active context (used by both UI and chat tools)."""
+    try:
+        # For now, context is client-side state. This endpoint validates and returns context data.
+        from logic.sql_engine import get_connection
+        
+        if req.context_type == "event":
+            conn = get_connection()
+            cursor = conn.execute("SELECT * FROM master_events WHERE event_id = ?", (req.context_id,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                data = dict(zip(columns, row))
+                return {"status": "success", "context": {"id": req.context_id, "type": "event", "summary": data.get('summary'), "data": data}}
+        elif req.context_type == "task":
+            conn = get_connection()
+            cursor = conn.execute("SELECT * FROM master_thoughts WHERE entry_id = ?", (req.context_id,))
+            row = cursor.fetchone()
+            conn.close()
+            if row:
+                columns = [desc[0] for desc in cursor.description]
+                data = dict(zip(columns, row))
+                return {"status": "success", "context": {"id": req.context_id, "type": "task", "summary": data.get('content_text'), "data": data}}
+        elif req.context_type == "enrichment":
+            # Enrichment queue context
+            return {"status": "success", "context": {"id": "enrichment_queue", "type": "enrichment", "summary": "Transaction Review"}}
+        
+        raise HTTPException(status_code=404, detail="Context not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class ScratchpadSaveRequest(BaseModel):
+    context_id: str
+    context_type: str
+    messages: list  # List of {role, content} dicts
+
+@app.post("/api/context/scratchpad/save")
+def save_scratchpad_endpoint(req: ScratchpadSaveRequest, current_user: dict = Depends(get_current_user)):
+    """Save entire scratchpad (all messages) to the linked context in the graph."""
+    try:
+        from logic.graph_db import GraphManager
+        
+        user_id = current_user['user_id']
+        gm = GraphManager()
+        
+        # Combine all messages into a single note
+        combined_text = "\n\n".join([
+            f"**{m['role'].title()}**: {m['content']}" 
+            for m in req.messages if m.get('content')
+        ])
+        
+        # Create a thought node linked to the context
+        success = gm.create_thought(
+            text=combined_text,
+            links=[f"{req.context_type}:{req.context_id}"],
+            metadata={"source": "scratchpad", "user_id": user_id}
+        )
+        
+        return {"status": "success" if success else "error"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/context/clear")
+def clear_context_endpoint(current_user: dict = Depends(get_current_user)):
+    """Clear context (client-side, this is just an acknowledgment endpoint)."""
+    return {"status": "success", "message": "Context cleared"}
+
+
 
 from logic.sql_engine import get_logs, clear_logs
 from scripts.causal_analysis import analyze_stress_spending
