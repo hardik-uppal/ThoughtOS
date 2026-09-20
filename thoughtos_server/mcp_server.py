@@ -604,9 +604,9 @@ def handle_query_notes(params: Dict) -> Dict:
         conn.row_factory = sqlite3.Row
         rows = conn.execute(
             """SELECT note_id, title, summary, note_type, created_at
-               FROM notes WHERE raw_text LIKE ?
+               FROM notes WHERE user_id = ? AND (raw_text LIKE ? OR title LIKE ?)
                ORDER BY created_at DESC LIMIT ?""",
-            (f"%{entity_name}%", limit),
+            ('local@thoughtos', f"%{entity_name}%", f"%{entity_name}%", limit),
         ).fetchall()
         conn.close()
 
@@ -649,7 +649,16 @@ def handle_query_notes(params: Dict) -> Dict:
             if r["source_note_id"]:
                 all_note_ids.add(r["source_note_id"])
 
+    # Keep unreviewed/unextracted notes discoverable beside existing entities.
+    # Lexical retrieval does not create or approve graph links.
+    text_rows = conn.execute(
+        "SELECT note_id FROM notes WHERE user_id = ? AND (raw_text LIKE ? OR title LIKE ?) ORDER BY created_at DESC LIMIT ?",
+        ('local@thoughtos', f"%{entity_name}%", f"%{entity_name}%", limit),
+    ).fetchall()
+    all_note_ids.update(r['note_id'] for r in text_rows)
+
     if not all_note_ids:
+        conn.close()
         return {
             "content": [{
                 "type": "text",
@@ -659,8 +668,8 @@ def handle_query_notes(params: Dict) -> Dict:
 
     placeholders = ",".join("?" for _ in all_note_ids)
     rows = conn.execute(
-        f"SELECT note_id, title, summary, note_type, created_at FROM notes WHERE note_id IN ({placeholders}) ORDER BY created_at DESC LIMIT ?",
-        list(all_note_ids) + [limit],
+        f"SELECT note_id, title, summary, note_type, created_at FROM notes WHERE user_id = ? AND note_id IN ({placeholders}) ORDER BY created_at DESC LIMIT ?",
+        ['local@thoughtos'] + list(all_note_ids) + [limit],
     ).fetchall()
     conn.close()
 
