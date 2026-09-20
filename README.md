@@ -89,9 +89,10 @@ Use one absolute database path for every harness. Notes/tasks and the graph now
 share that path, independent of the project working directory. Restart existing
 MCP clients after upgrading. Code pushes do **not** sync private notes.
 
-See [multi-machine storage and backup plan](MULTI_MACHINE.md) for a canonical
-private server, SSH MCP access, and safe SQLite backup/migration. Remote hosting,
-a daemon and synchronization are not installed yet.
+See [multi-machine storage and deployment](MULTI_MACHINE.md) for the canonical
+home-server, SSH MCP access, safe SQLite consolidation, and `thoughtos-sync` /
+`thoughtos-remote`. Live writes run on the server; local DBs are read-only snapshots.
+No public HTTP daemon or bidirectional file sync is used.
 
 ## Extraction Pipeline
 

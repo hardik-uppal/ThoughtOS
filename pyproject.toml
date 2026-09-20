@@ -40,6 +40,8 @@ all = [
 
 [project.scripts]
 thoughtos = "thoughtos_server.cli:main"
+thoughtos-sync = "thoughtos_server.sync:main"
+thoughtos-remote = "thoughtos_server.sync:remote_main"
 
 [tool.setuptools.packages.find]
 include = ["thoughtos_server*", "logic*", "backend*"]

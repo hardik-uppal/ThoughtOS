@@ -1,94 +1,123 @@
-# ThoughtOS storage and multiple machines
+# ThoughtOS across machines
 
-## Current state
+## Deployment
 
-Code is versioned in Git; private notes and graph data are not. On the current Mac,
-Claude/Codex configure `THOUGHTOS_DB_PATH=/Users/hardikuppal/ThoughtOS/context_os.db`.
-Pushing source code does not upload or synchronize that database. The Wardrub seed
-notes remain local. No remote service, daemon, periodic graph worker, review skill,
-or cross-machine sync has been installed by this change.
+The canonical live database is on `home-server` (Tailscale SSH alias,
+`hardik@100.76.207.86`): `/home/hardik/Projects/ThoughtOS/context_os.db`.
+The repository is `/home/hardik/Projects/ThoughtOS`; its package is installed in
+that directory's `venv`. All live captures and graph changes belong on this host.
 
-The shared path resolver now applies to graph, note/task storage and the legacy
-embedding store. `THOUGHTOS_DB_PATH` is preferred; use an absolute path. Defaults
-and explicit relative paths are anchored to the installed package/repository root,
-not whichever project launched the CLI/MCP process. For a packaged/production
-installation, always set an absolute path in a writable data directory.
-Explicit intake `db_path` overrides apply to notes/tasks as well as the graph.
-Restart existing MCP clients after upgrading to load the change.
+MCP clients launch `scripts/thoughtos-home mcp` through authenticated SSH stdio.
+This runs a server-side process per client, sharing the canonical local SQLite
+file. No public HTTP listener, background HTTP daemon, or socket worker is needed.
+Do not expose the existing unauthenticated `mcp --port` transport publicly.
 
-No database was moved, merged, cleared or re-extracted. This corrects future
-reads/writes; it does not automatically recover stray databases from old working
-directories. Inspect those separately before importing/deduplicating records.
-`THOUGHTOS_LLM_ENABLED=0` now also disables legacy Gemini note standardization,
-not just graph extraction. This does not disable explicit embedding/re-extraction
-commands that intentionally call a provider; do not run those without consent.
+The Mac database at `~/ThoughtOS/context_os.db` becomes a **read-only snapshot**,
+not a second writable primary. Old local MCP processes must be stopped during
+cutover; restart Claude/Codex sessions to load their updated SSH configuration.
+An offline server causes an explicit connection failure, never a silent local write.
 
-## Recommended first multi-machine deployment (proposed)
+## Everyday commands
 
-Use one always-on private host with one canonical SQLite database on its local
-persistent disk. Clients on each Mac/PC connect to that host. Do not maintain an
-independently writable database copy per machine.
+After installing this package and the local sync config:
 
-```text
-Mac / second computer / coding harness
-              | authenticated private connection
-              v
-        ThoughtOS on one host
-              |
-       local persistent SQLite
-              |
-       encrypted tested backups
+```sh
+thoughtos-remote note "An original note"    # write on home-server
+thoughtos-remote tasks                     # read live server data
+thoughtos-remote stats
+thoughtos-sync                             # pull a consistent read-only snapshot
+thoughtos-sync --deploy                    # snapshot, fast-forward Git, install package
 ```
 
-An initial bridge can use **SSH stdio MCP**: the client launches an MCP process
-on the canonical host and forwards its stdin/stdout. All server processes use the
-same absolute database path on that host. SSH handles encryption/authentication;
-no public HTTP MCP endpoint is necessary. Example client command, after provisioning:
+`thoughtos-sync` is deliberately NOT bidirectional database replication. It uses
+SQLite's backup API (including committed WAL data), transfers over SSH, validates
+integrity, then atomically replaces the local snapshot. It never uploads the local
+snapshot over the live server database. Keep local snapshots on private encrypted
+disks; they contain the whole personal database, not just notes.
 
-```text
-ssh -T thoughtos-host env THOUGHTOS_DB_PATH=/srv/thoughtos/context_os.db THOUGHTOS_LLM_ENABLED=0 /srv/thoughtos/.venv/bin/thoughtos mcp
+`--deploy` refuses tracked server edits or divergent Git history; it does not
+reset the server. Push reviewed code first. Restart MCP sessions after deployment
+so existing processes use the new package. A failed deployment reports an error;
+Git/package deployment is not an atomic release manager. Roll back code by checking
+out the previous known commit and reinstalling the package; do not roll back the
+live database casually. No background schedule is installed by these commands.
+
+## Configuring another machine
+
+Install the package from the desired Git ref and set up authenticated SSH/Tailscale
+access (verify host keys). Put this in `~/.config/thoughtos/sync.json`, substituting
+the local snapshot path for that machine:
+
+```json
+{
+  "host": "home-server",
+  "remote_repo": "/home/hardik/Projects/ThoughtOS",
+  "remote_python": "/home/hardik/Projects/ThoughtOS/venv/bin/python",
+  "remote_db": "/home/hardik/Projects/ThoughtOS/context_os.db",
+  "remote_command": "/home/hardik/Projects/ThoughtOS/scripts/thoughtos-home",
+  "branch": "fix/shared-database-path",
+  "local_snapshot": "~/ThoughtOS/context_os.db"
+}
 ```
 
-Use SSH keys, a restricted dedicated OS account, verified host keys, private
-network access (e.g. Tailscale), and no interactive shell banners on stdout. This
-example is a deployment design, not an already-configured host.
+Set the MCP command to `thoughtos-remote` with arguments `["mcp"]` (use its absolute
+installed path if the harness doesn't inherit your PATH). Or use:
 
-For a shared HTTP daemon later, add authenticated MCP transport and a thin stdio
-bridge. Bind privately and use TLS/token validation. **Do not expose the existing
-`mcp --port` handler publicly**: it currently binds all interfaces and lacks the
-necessary remote authorization. The current local HTTP auth assumptions are not
-an audited multi-user service. Existing MCP handlers are single-owner tooling.
+```text
+command: ssh
+args: [-T, -o, BatchMode=yes, home-server, /home/hardik/Projects/ThoughtOS/scripts/thoughtos-home, mcp]
+```
 
-SQLite is sufficient for a single personal server and modest concurrency. A
-PostgreSQL migration becomes useful for multiple API replicas/high concurrent
-writes; it is not needed merely to connect a second laptop. Graph tables can
-remain relational. Do not use a live SQLite file over SMB/NFS/shared drive mounts.
+Protect SSH keys and allow only trusted devices/accounts. This is single-owner
+personal tooling, not an audited multi-tenant service. No API keys belong in Git.
+The wrapper reads optional owner-only `~/.config/thoughtos/server.env`. Server model
+preferences belong there rather than as uncommitted edits to package defaults.
+LLM standardization/extraction and rule generation stay off until explicitly enabled.
+The preserved home-server model preference is `gemma3:27b` on local Ollama.
 
-## Backups and migration
+## Initial database/history consolidation
 
-- Do not sync a live `.db`, `-wal` or `-shm` file through Git, Google Drive, Dropbox
-  or iCloud. File sync does not coordinate SQLite transactions and can lose updates.
-- Use SQLite's backup API (including committed WAL data), not a blind file copy
-  while processes may be writing. Keep snapshots outside the repository.
-- Encrypt backups, restrict permissions, set retention, and regularly test a restore.
-- For the first server migration: stop local writes, take a consistent snapshot,
-  copy through an encrypted channel, restore to the canonical host, validate
-  `PRAGMA integrity_check` plus note/task/entity counts, then point all clients to
-  the host. Keep the old database read-only as rollback until verified.
-- If a client is offline, initially report unavailable rather than silently creating
-  a divergent local database. Durable offline capture/outbox, stable operation IDs,
-  retries and conflict resolution should be a separate implemented milestone.
+The home-server's existing code history and uncommitted model preference were
+preserved in `sync/home-server-preferences` and merged into the feature history.
+The machine-specific model preference is then moved into environment configuration.
+Code changes and history go through Git; private database content never does.
 
-`.gitignore` covers SQLite data and sidecars. Historical `data/sunya.db` is already
-tracked as an empty file; ignore rules do not untrack existing files. Never stage
-private database contents. A future encrypted backup destination still needs to
-be selected; nothing is uploaded by this documentation.
+Before merging databases, take consistent snapshots of **both** databases into
+owner-only backup directories, then stop local writers. The additive importer is:
 
-## Verification for this change
+```sh
+python -m thoughtos_server.database_admin snapshot SOURCE.db BACKUP.db
+python -m thoughtos_server.database_admin merge SOURCE-SNAPSHOT.db LIVE-TARGET.db
+```
+
+It inserts missing primary-key records, skips byte/value-identical records, and
+rolls back the entire import on differing duplicate IDs, schema mismatches, missing
+keys or failed integrity/foreign-key checks. It never deletes records, overwrites
+conflicting content, guesses the newest timestamp or re-extracts notes. Review any
+conflict manually; this is one-time conservative consolidation, not general sync.
+The Mac's six seed notes share the existing `local@thoughtos` owner namespace.
+
+## Storage, retention and limitations
+
+- Configure one absolute `THOUGHTOS_DB_PATH`; notes, tasks and graph use it consistently.
+- No live SQLite file syncing through Git/Drive/Dropbox/iCloud or SMB/NFS mounts.
+- Local snapshots are refreshable caches, not historical/versioned backups.
+- Keep periodic encrypted off-host backups with retention and restore testing. The
+  migration makes point-in-time backups, but automatic backup scheduling/encryption
+  and an off-host retention destination are still to be configured.
+- SQLite is sufficient for a personal host and modest concurrency. PostgreSQL is
+  appropriate if multiple API replicas/high write concurrency become necessary.
+- Offline writable copies need stable operation IDs, an outbox, deletion tombstones
+  and explicit conflict handling; not implemented here.
+- Inferred graph changes still need review; this migration does not approve existing
+  inferred knowledge or enable a periodic extraction/nightly-review worker.
+- `.gitignore` covers DB files/sidecars. Historical `data/sunya.db` is tracked but
+  empty; do not stage any private database or backup.
+
+## Tests
 
 `THOUGHTOS_LLM_ENABLED=0 .venv/bin/python -m unittest discover -s tests -v`
 
-Tests use disposable databases only: alternate working directories, absolute and
-relative configuration, explicit per-call DB override, override restoration,
-shared notes/tasks/graph tables and disabled cloud standardization. No model calls
-or automatic changes to existing private notes.
+Disposable DB tests cover path isolation, capture/graph consistency, cloud-off
+standardization, additive/idempotent merging, full conflict rollback, schema refusal
+and snapshots containing committed WAL data. No provider calls are required.

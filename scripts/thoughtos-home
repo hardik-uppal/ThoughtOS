@@ -1,0 +1,13 @@
+#!/bin/sh
+# Private SSH/stdio entry point. No listener or public port.
+set -eu
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+if [ -r "$HOME/.config/thoughtos/server.env" ]; then
+    set -a
+    . "$HOME/.config/thoughtos/server.env"
+    set +a
+fi
+export THOUGHTOS_DB_PATH="${THOUGHTOS_DB_PATH:-$ROOT/context_os.db}"
+export THOUGHTOS_LLM_ENABLED="${THOUGHTOS_LLM_ENABLED:-0}"
+export THOUGHTOS_RULE_GEN_ENABLED="${THOUGHTOS_RULE_GEN_ENABLED:-0}"
+exec "$ROOT/venv/bin/thoughtos" "$@"
