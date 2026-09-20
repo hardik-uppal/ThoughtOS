@@ -19,3 +19,5 @@ backups/
 data/
 client_secret*.json
 *.egg-info/
+build/
+dist/

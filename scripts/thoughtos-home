@@ -1,7 +1,15 @@
 #!/bin/sh
 # Private SSH/stdio entry point. No listener or public port.
 set -eu
-ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+SCRIPT=$0
+while [ -L "$SCRIPT" ]; do
+    TARGET=$(readlink "$SCRIPT")
+    case "$TARGET" in
+        /*) SCRIPT=$TARGET ;;
+        *) SCRIPT=$(dirname -- "$SCRIPT")/$TARGET ;;
+    esac
+done
+ROOT=$(CDPATH= cd -- "$(dirname -- "$SCRIPT")/.." && pwd)
 if [ -r "$HOME/.config/thoughtos/server.env" ]; then
     set -a
     . "$HOME/.config/thoughtos/server.env"
