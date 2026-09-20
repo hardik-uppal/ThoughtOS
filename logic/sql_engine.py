@@ -3,10 +3,10 @@ import json
 import os
 from datetime import datetime
 
-DB_NAME = "context_os.db"
+from thoughtos_server.paths import database_path
 
 def get_connection():
-    return sqlite3.connect(DB_NAME)
+    return sqlite3.connect(database_path(), timeout=30)
 
 def init_db():
     """

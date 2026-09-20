@@ -1,4 +1,5 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 .env
@@ -7,6 +8,14 @@ token.json
 *.log
 .DS_Store
 *.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+backups/
 data/
 client_secret*.json
 *.egg-info/

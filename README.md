@@ -82,8 +82,16 @@ export THOUGHTOS_LLM_ENABLED=0
 
 # Server
 export THOUGHTOS_PORT=8000
-export THOUGHTOS_DB_PATH=context_os.db
+export THOUGHTOS_DB_PATH="$HOME/ThoughtOS/context_os.db"
 ```
+
+Use one absolute database path for every harness. Notes/tasks and the graph now
+share that path, independent of the project working directory. Restart existing
+MCP clients after upgrading. Code pushes do **not** sync private notes.
+
+See [multi-machine storage and backup plan](MULTI_MACHINE.md) for a canonical
+private server, SSH MCP access, and safe SQLite backup/migration. Remote hosting,
+a daemon and synchronization are not installed yet.
 
 ## Extraction Pipeline
 
