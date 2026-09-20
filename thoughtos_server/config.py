@@ -12,7 +12,7 @@ from typing import Optional
 class LLMConfig:
     """Configuration for a specific LLM provider."""
     provider: str = "ollama"  # ollama, gemini, openai
-    model: str = "llama3.2:3b"
+    model: str = "gemma3:27b"
     base_url: str = "http://127.0.0.1:11434"
     api_key: Optional[str] = None
     temperature: float = 0.1
@@ -36,7 +36,7 @@ class ExtractionConfig:
 
     # Separate LLM for rule generation (often a smarter model)
     rule_gen_llm: LLMConfig = field(
-        default_factory=lambda: LLMConfig(model="llama3.2:3b")
+        default_factory=lambda: LLMConfig(model="gemma3:27b")
     )
 
 
