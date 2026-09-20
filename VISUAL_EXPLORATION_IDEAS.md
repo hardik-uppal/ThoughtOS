@@ -1,6 +1,6 @@
 # ThoughtOS — Visual Exploration Ideas
 
-Status: product/design exploration, not an implementation commitment.
+Status: desk-first sample-data prototype 02 implemented; real-data integration is not enabled. User direction: notebook for tablets, Zettel desk for laptops/computers, constellation for a later AR/spatial experience. Focus now is intuitive desktop editing, tags, linking and branching traversal. See [`prototypes/visual-garden/README.md`](prototypes/visual-garden/README.md) for preview/tests and [`DESK_DIRECTION.md`](prototypes/visual-garden/DESK_DIRECTION.md) for source readiness.
 
 ## User's direction
 
@@ -27,7 +27,7 @@ Shared requirements: search, accessible keyboard navigation, clear back/undo, re
 
 Prototype the same 15–30 representative, non-sensitive notes in all three views. Test finding a known note, discovering a related idea, creating a link, and returning to the starting point. Then choose one view for the first functional implementation.
 
-Before implementation, inspect the existing server APIs, note/link schema, and archived UI; confirm the intended client platform. No new frontend stack is selected yet.
+The dependency-free browser application in `prototypes/visual-garden/` is separate from the archived frontend. Version 01 explored three views; version 02 parks notebook/constellation and concentrates on the desk, focused thought chains and an accessible list. It retains 20 invented notes and prior browser edits, with explicit connection search, tag chips, global Find and branch/back/forward navigation. Canonical ThoughtOS data and syncing are untouched. Read-only inventory found 47 real notes, 41 open tasks, but zero explicit note links and no registered Obsidian vault. Validate source scope and authentication before connecting real data.
 
 ## Capture status
 

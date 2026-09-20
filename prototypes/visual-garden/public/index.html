@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f1e9">
+  <meta name="description" content="A desk for connected thinking. Write a note, connect an idea, follow a thread.">
+  <title>ThoughtOS — your thinking desk</title>
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./style.css"><link rel="stylesheet" href="./desk.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to notes</a>
+  <aside class="sidebar" aria-label="Collections and topics">
+    <a class="brand" href="./" aria-label="ThoughtOS home"><span class="brand-mark">✳</span> thought<span>os</span><sup>LAB</sup></a>
+    <p class="sidebar-caption">A little space for<br>your unfinished thinking.</p>
+    <button class="capture-button" id="new-note" title="New thought: N, or Cmd/Ctrl+N when the browser allows it"><span>＋</span> New thought <kbd>N</kbd></button>
+    <div class="section-label">YOUR CORNERS <span>↙</span></div>
+    <nav id="collections" aria-label="Filter by collection"></nav>
+    <section class="cloud-section" aria-labelledby="cloud-heading"><h2 class="section-label" id="cloud-heading">ON YOUR MIND</h2><div id="cloud" class="word-cloud"></div><p class="cloud-help">Pick a topic to filter the desk.<br>Bigger word, more notes.</p></section>
+    <div class="sidebar-bottom"><span class="local-dot"></span> Demo notes · saved in this browser<p>Your Obsidian vault and live<br>ThoughtOS notes are not connected.</p><button id="source-info" class="text-button">About your note sources ↗</button><br><button id="reset" class="text-button">Reset demo notes ↺</button></div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><div class="location-label">YOUR THINKING DESK <span>/</span> <span id="corner-label">All thoughts</span></div><div class="header-actions"><button class="finder-button" id="find-note"><span aria-hidden="true">⌕</span> Find a thought <kbd data-key="F">⌘ F</kbd></button><button id="help" class="help-button" aria-label="How to use the desk and keyboard shortcuts">?</button></div></header>
+    <div id="storage-warning" class="warning" hidden></div>
+    <section class="intro"><div><div class="eyebrow">THOUGHTOS / ZETTEL DESK · 02</div><h1>Give a thought <em>somewhere to go.</em></h1><p>Open a card. Connect another. Follow the idea, not a folder.</p></div></section>
+    <section class="quick-start" aria-label="Getting started"><span><b>01</b> Open a card to read or edit</span><span><b>02</b> <strong>Connect</strong> → choose another thought</span><span><b>03</b> <strong>Explore chain</strong> → follow any branch</span><button id="dismiss-guide" aria-label="Dismiss getting started tips">×</button></section>
+    <section class="viewbar" aria-label="Desk controls"><div class="view-tabs" role="group" aria-label="Desk layout"><button data-view="desk" aria-pressed="true">▦ All cards</button><button data-view="chain" aria-pressed="false">↔ Explore chain</button><button data-view="list" aria-pressed="false">☷ List</button></div><label class="search"><span aria-hidden="true">⌕</span><input id="search" type="search" placeholder="Filter this desk…" aria-label="Filter desk"></label><button id="wander" class="text-button">Surprise me ↗</button></section>
+    <nav id="journey" class="journey" aria-label="Thought chain history"></nav>
+    <div class="workspace-meta"><div><span id="note-count"></span><button id="clear-filter" class="filter-pill" hidden></button></div><div class="meta-actions"><button id="undo" class="text-button" disabled>↶ Undo edit</button><span id="view-hint">Open · edit · connect</span></div></div>
+    <div class="workspace-layout"><section id="workspace" class="workspace" tabindex="-1" aria-label="Thought cards"></section><aside id="inspector" class="inspector" aria-label="Selected thought"></aside></div>
+    <footer class="footer"><span>Notes are starting points, not destinations.</span><span>Sample-data prototype · browser only <span aria-hidden="true">✳</span></span></footer>
+  </main>
+  <dialog id="editor-dialog" aria-labelledby="editor-heading">
+    <form id="editor-form"><div class="dialog-header"><div><div class="eyebrow" id="editor-eyebrow">ONE IDEA IS ENOUGH</div><h2 id="editor-heading">New thought</h2></div><button type="button" class="icon-button" data-close="editor-dialog" aria-label="Close editor">×</button></div>
+      <label>Title<input name="title" required maxlength="120" placeholder="What caught your attention?"></label>
+      <label>Your note<textarea name="body" rows="6" maxlength="20000" placeholder="It doesn't need to be finished."></textarea></label>
+      <label>Collection<select name="topic"></select></label>
+      <fieldset class="tag-field"><legend>Tags <span>Group thoughts without creating a connection.</span></legend><div id="editing-tags" class="editing-tags"></div><label for="tag-input" class="sr-only">Add a tag</label><div class="tag-entry"><input id="tag-input" maxlength="120" placeholder="Type a tag, then press Enter"><button type="button" id="add-tag">Add tag</button></div><input type="hidden" name="tags"><div id="tag-suggestions" class="tag-suggestions"></div></fieldset>
+      <p class="form-help">Saved in this browser only. <span data-key="S">⌘ S</span> to save. Escape to cancel.</p><button type="submit" class="capture-button">Save thought ↗</button>
+    </form>
+  </dialog>
+  <dialog id="picker-dialog" class="picker-dialog" aria-labelledby="picker-heading"><div class="dialog-header"><div><div class="eyebrow" id="picker-eyebrow">JUMP TO AN IDEA</div><h2 id="picker-heading">Find a thought</h2></div><button class="icon-button" data-close="picker-dialog" aria-label="Close thought picker">×</button></div><p id="picker-context" class="picker-context"></p><label for="picker-search" class="sr-only">Search thoughts</label><input id="picker-search" type="search" placeholder="Search title, text or #tag…" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="picker-results"><div class="picker-meta"><span id="picker-count" role="status"></span><span>↑ ↓ choose · Enter select · Esc close</span></div><div id="picker-results" role="listbox" aria-label="Matching thoughts"></div><button id="new-linked" class="new-linked" hidden>＋ Write a new thought and connect it</button><p id="picker-feedback" class="picker-feedback" role="status"></p></dialog>
+  <dialog id="help-dialog" aria-labelledby="help-heading"><div class="dialog-header"><h2 id="help-heading">A desk, not a puzzle.</h2><button class="icon-button" data-close="help-dialog" aria-label="Close help">×</button></div><ol class="how-to"><li><b>Open a card.</b> Use <strong>Edit note</strong> to write. <strong>Tags</strong> opens the same editor at the tag field.</li><li><b>Connect two thoughts.</b> Click <strong>Connect</strong> on a card, search for another, then choose <strong>Connect</strong>. Both cards show the link. Or write a new, connected thought.</li><li><b>Follow any branch.</b> <strong>Explore chain</strong> puts a thought between its connections. Click any neighbouring card to continue. Back, Forward and the breadcrumb trail keep your place.</li><li><b>Tags are not links.</b> Nearby thoughts share tags but are labelled <em>not linked</em>. Only you decide to connect them.</li></ol><dl class="shortcut-list"><dt><kbd>N</kbd> / <kbd data-key="N">⌘ N</kbd></dt><dd>New thought*</dd><dt><kbd data-key="F">⌘ F</kbd> / <kbd data-key="K">⌘ K</kbd> / <kbd>/</kbd></dt><dd>Find a thought</dd><dt><kbd>E</kbd> / <kbd>T</kbd> / <kbd>C</kbd> / <kbd>X</kbd></dt><dd>Edit / Tags / Connect / Explore current thought</dd><dt><kbd>Arrow keys</kbd> + <kbd>Enter</kbd></dt><dd>Move between cards, then open</dd><dt><kbd>Alt ←</kbd> / <kbd>Alt →</kbd></dt><dd>Back / Forward along your trail</dd><dt><kbd data-key="S">⌘ S</kbd></dt><dd>Save while editing</dd><dt><kbd>?</kbd></dt><dd>This guide</dd></dl><p class="form-help">*Cmd/Ctrl+N is supported when the browser passes it to the page. Some browsers always open a new window. Use N outside a text field or the New thought button instead. Plain-letter shortcuts never run while you are typing.</p></dialog>
+  <dialog id="sources-dialog" aria-labelledby="sources-heading"><div class="dialog-header"><h2 id="sources-heading">One desk. Different sources.</h2><button class="icon-button" data-close="sources-dialog" aria-label="Close sources">×</button></div><div class="source-row"><b>This prototype</b><span class="source-badge">ACTIVE</span><p>20 invented notes to test the interaction. Your edits live in this browser.</p></div><div class="source-row"><b>ThoughtOS</b><span>NOT CONNECTED</span><p>Your real notes, extracted entities and tasks are separate. A read-only preview is the next integration step, not an automatic import.</p></div><div class="source-row"><b>Obsidian</b><span>VAULT NEEDED</span><p>Choose a vault or a selected Markdown export. Preserve note paths, tags, [[wikilinks]] and task checkboxes. Preview before importing.</p></div><div class="source-row"><b>Claude tasks / reminders</b><span>NOT CONNECTED</span><p>Identify the source first. Session tasks are not necessarily scheduled reminders. Preserve status and source links; never guess a due date.</p></div><p class="form-help">No source contents are loaded by this demo. Connecting real data will be a separate, explicit step.</p></dialog>
+  <div id="announcement" role="status" aria-live="polite" class="sr-only"></div><div id="toast" class="toast" role="status" hidden></div>
+</body>
+</html>

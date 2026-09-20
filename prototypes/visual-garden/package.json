@@ -1,0 +1,12 @@
+{
+  "name": "thoughtos-visual-garden",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Isolated, browser-local ThoughtOS exploration prototype",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test tests/model.test.mjs"
+  },
+  "engines": { "node": ">=20" }
+}
