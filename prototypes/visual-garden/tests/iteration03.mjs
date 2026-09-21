@@ -48,7 +48,7 @@ try {
   assert.match(await page.locator('#inspector [data-hop="n20"]').textContent(), /→ inspires/);
   await page.locator('#inspector [data-hop="n20"]').click(); await page.locator('[data-read]').click();
   assert.match(await page.locator('#inspector [data-hop="n1"]').textContent(), /← inspires/);
-  await page.locator('[data-name-link="n1"]').click();
+  await page.locator('#inspector [data-name-link="n1"]').click();
   await page.locator('#relationship-label').fill('provides a starting point for'); await page.locator('#relationship-form .capture-button').click();
   assert.match(await page.locator('#inspector [data-hop="n1"]').textContent(), /← provides a starting point for/);
   await page.reload();
@@ -94,7 +94,7 @@ try {
   assert.match(await page.locator('#picker-results').textContent(), /Similar meaning/);
   await page.screenshot({ path: '/tmp/thoughtos-meaning-v3.png' });
   await page.locator('[data-pick]').first().click();
-  assert.match(await page.locator('.around-grid').textContent(), /similar meaning/);
+  assert.match(await page.locator('.around-grid').textContent(), /similar meaning/i);
   // Model failure is explicit and falls back to normal search without false semantic labels.
   await page.route('**/api/semantic', route => route.fulfill({ json: { error: 'Local model unavailable. Text & tags still work.' } }));
   await page.locator('#find-note').click(); await page.locator('#picker-search').fill('diffusion');

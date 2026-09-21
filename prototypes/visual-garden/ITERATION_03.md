@@ -2,7 +2,11 @@
 
 Based on baseline `06ea758`. This checkpoint contains iteration 03 and the first browser-feedback pass. The home-server deployment has not been updated. See `NEXT_SESSION.md` for the next requested change.
 
-## Latest browser-feedback pass
+## Centered-thought follow-up
+
+After checkpoint `886d3ce`, the user requested a centered main thought and clearer reasons/colour similarity. The thought now anchors the middle, with note wings on both sides. Shared tags use green, local-model similarity uses lavender, and other notes use neutral paper, each with a text label. Named connection reasons are prominent; unnamed legacy links offer Add reason without invented semantics. All/unconnected/connected scopes remain intact. Responsive mobile layout keeps the main thought first. Browser tests cover center alignment, both wings and direct reason editing.
+
+## Earlier browser-feedback pass
 
 - Replaced the large framed chain diagram with the full selected thought beside a grid of all other notes. Unconnected notes are interleaved from the first row; All / Unconnected / Connected selectors keep every note reachable, including notes without shared tags or model matches. Traversal and reading never create links.
 - Removed the promotional heading and multiple toolbar rows. A single quiet toolbar leads straight into notes. Secondary tools are in the ••• menu.

@@ -2,21 +2,21 @@
 
 Checkpoint: iteration 03 plus the first browser-feedback pass, on `fix/shared-database-path`. See `ITERATION_03.md` for implementation and data boundaries.
 
-## Latest request — not implemented in this checkpoint
+## Latest request — implemented after resuming
 
 The user reviewed the exploration view at roughly 1230 × 781 and said:
 
 > main though should be center and rest around it and empahsising connection reason somehow, or telling with color similarity
 
-Next: place the current thought in the center, arrange other notes around it, and make relationship reasons easy to see. Use similarity colour cues if useful, with text labels so colour is not the only signal. Preserve named/directional connection meanings. Do not invent reasons for unnamed legacy links or present inferred similarity as an explicit connection.
+Implemented: the current thought is centered between two wings of notes. Named/directional reasons are prominent above connected-note titles; unnamed legacy links show “reason not named” and an Add reason action. Green identifies shared tags, lavender identifies local-model similarity, and neutral paper identifies notes from elsewhere. Every colour has a matching text cue. Colour is not evidence of an explicit link. On narrow screens the current thought leads above the surrounding notes.
 
 Keep the earlier feedback intact: unconnected notes must remain reachable and visible alongside connected notes; avoid returning to a restrictive connections-only diagram. Keep the collapsed collections drawer, quieter toolbar, independent playful word cloud, and collections that grow from saved note assignments.
 
 ## Current state and verification
 
-The selected thought currently sits on the left of a note grid. All / Unconnected / Connected scopes are available. The latest centered-layout request has no partial implementation.
+The selected thought is now centered. All / Unconnected / Connected scopes remain available; unconnected notes stay in the first visible row. The earlier implementation was pushed as `886d3ce`. This follow-up includes the centered layout and reason/similarity cues. No additional requested UI change is pending; the next step is user review, with home-server deployment still separate.
 
-17 unit tests and all three browser suites passed during this session, including real local embeddings, snapshot recovery, migration and mobile layouts. `git diff --check` was clean before the checkpoint.
+17 unit tests passed for the baseline; all three browser suites were rerun for this follow-up, including centered geometry, notes on both sides, editing relationship reasons, local embeddings, snapshot recovery, migration and mobile layouts. `git diff --check` was clean before the checkpoint.
 
 ```sh
 cd prototypes/visual-garden

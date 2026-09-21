@@ -352,3 +352,57 @@ body[data-density=comfortable] .desk-grid{grid-template-columns:1fr}
 @media(max-width:700px) { .around-card.nearby-card > .around-open { padding: 14px 12px 8px; } }
 .reader-open .inspector { top: 72px; max-height: calc(100dvh - 88px); }
 .topbar { position: relative; z-index: 36; }
+
+/* The current thought anchors the middle; colour describes similarity, not links. */
+.chain-board, .reader-open .chain-board { display: block; padding: 0 0 30px; }
+.chain-board > .around-heading { margin-bottom: 20px; }
+.similarity-key { display: flex; align-items: center; gap: 16px; font: 10px var(--sans); color: #7c816f; }
+.similarity-key span:before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; border: 1px solid #6b735a35; }
+.key-tags:before { background: #cbd9b8; }
+.key-meaning:before { background: #d9cfe6; }
+.key-other:before { background: #e7e3d8; }
+.orbit-layout.around-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(300px,360px) minmax(0,1fr); gap: 38px; align-items: start; }
+.orbit-layout .chain-focus, .reader-open .orbit-layout .chain-focus { grid-column: 2; grid-row: 1; margin-top: 58px; position: sticky; top: 24px; padding: 26px 28px 19px; background: #f2e9cf; box-shadow: 0 4px 16px #3c452215; }
+.orbit-layout .chain-focus h2 { font-size: 33px; }
+.orbit-wing { display: grid; grid-template-columns: minmax(0,1fr); gap: 20px; min-width: 0; }
+.orbit-left { grid-column: 1; grid-row: 1; }
+.orbit-right { grid-column: 3; grid-row: 1; }
+.orbit-layout .around-card { position: relative; min-height: 218px; order: var(--order); }
+.around-card.tone-tags, .around-card.nearby-card.tone-tags { --paper: #e6ecdb; background: var(--paper); }
+.around-card.tone-meaning, .around-card.nearby-card.tone-meaning { --paper: #ece5f0; background: var(--paper); }
+.around-card.tone-other, .around-card.nearby-card.tone-other { --paper: #efede5; background: var(--paper); }
+.orbit-layout .around-open { gap: 11px; padding: 16px 18px 8px; }
+.orbit-layout .around-open strong { font-size: 24px; }
+.orbit-layout .around-excerpt { -webkit-line-clamp: 2; }
+.orbit-layout .relation-caption { font-size: 10px; line-height: 1.55; overflow-wrap: anywhere; }
+.orbit-layout .is-linked .relation-caption { color: #8a5a2e; font-weight: 600; padding-bottom: 7px; border-bottom: 1px solid #b99a6845; width: 100%; }
+.orbit-layout .is-linked:after { content: ''; position: absolute; top: 29px; width: 30px; border-top: 1px solid #bc9b6b; opacity: .7; pointer-events: none; }
+.orbit-left .is-linked:after { left: 100%; }
+.orbit-right .is-linked:after { right: 100%; }
+.similarity-caption { display: block; margin-top: auto; font: 9px/1.5 var(--sans); color: #7c836d; overflow-wrap: anywhere; }
+.orbit-layout .around-actions [data-name-link] { color: #916439; }
+@media(min-width:1650px) {
+  .orbit-layout.around-grid { grid-template-columns: minmax(0,1fr) 380px minmax(0,1fr); gap: 36px; }
+  .orbit-wing { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 18px; }
+  .orbit-layout .is-linked:after { display: none; }
+}
+@media(max-width:1000px) and (min-width:701px) {
+  .orbit-layout.around-grid { grid-template-columns: minmax(0,1fr) minmax(255px,1.2fr) minmax(0,1fr); gap: 18px; }
+  .orbit-layout .chain-focus, .reader-open .orbit-layout .chain-focus { padding: 21px 19px 16px; margin-top: 48px; }
+  .orbit-layout .chain-focus h2 { font-size: 28px; }
+  .orbit-layout .around-open strong { font-size: 21px; }
+  .orbit-layout .is-linked:after { width: 14px; }
+  .orbit-layout .around-open, .orbit-layout .nearby-card > .around-open { padding: 14px 12px 8px; }
+  .orbit-layout .focus-actions { flex-wrap: wrap; }
+}
+@media(max-width:700px) {
+  .orbit-layout.around-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+  .orbit-layout .chain-focus, .reader-open .orbit-layout .chain-focus { position: static; grid-column: 1/-1; grid-row: auto; order: -1; margin: 0 0 10px; padding: 23px; }
+  .orbit-wing { display: contents; }
+  .orbit-layout .around-card { min-height: 245px; }
+  .orbit-layout .is-linked:after { display: none; }
+  .orbit-layout .around-open strong { font-size: 21px; }
+  .orbit-layout .around-open, .orbit-layout .nearby-card > .around-open { padding: 14px 12px 8px; }
+  .similarity-key { gap: 12px; font-size: 9px; }
+  .chain-board > .around-heading { margin-bottom: 16px; }
+}

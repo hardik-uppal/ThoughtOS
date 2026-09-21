@@ -13,6 +13,13 @@ try {
   assert.equal(await page.locator('.around-card').count(), 19);
   assert.equal(await page.locator('.nearby-card').count(), 14);
   assert.equal(await page.locator('.branch-card').count(), 5);
+  const board = await page.locator('.orbit-layout').boundingBox(), focus = await page.locator('.chain-focus').boundingBox();
+  assert.ok(Math.abs(focus.x + focus.width/2 - (board.x + board.width/2)) < 2, 'Current thought is centered');
+  const left = await page.locator('.orbit-left').boundingBox(), right = await page.locator('.orbit-right').boundingBox();
+  assert.ok(left.x + left.width < focus.x && right.x > focus.x + focus.width, 'Other notes surround both sides');
+  assert.ok(await page.locator('.is-linked.tone-tags').count() > 0);
+  assert.ok(await page.locator('.nearby-card.tone-other').count() > 0);
+
   const firstUnlinked = await page.locator('.nearby-card').first().boundingBox();
   assert.ok(firstUnlinked.y + 80 < 781);
   assert.match(await page.locator('.nearby-card').first().textContent(), /Not connected/);
@@ -25,6 +32,15 @@ try {
   const persisted = await page.evaluate(() => localStorage.getItem('thoughtos.visual-garden.v1'));
   assert.equal(persisted, null, 'Wandering never creates a link or writes notes');
   await page.locator('#back').click(); assert.equal(await page.locator('.chain-focus h2').textContent(), 'Small notes, big connections');
+  await page.locator('[data-neighbors="all"]').click();
+  await page.locator('.orbit-layout [data-name-link="n1"]').click();
+  assert.equal(await page.locator('#relationship-label').inputValue(), '', 'Legacy reason is not invented');
+  await page.locator('#relationship-label').fill('develops this idea');
+  await page.locator('#relationship-form .capture-button').click();
+  assert.match(await page.locator('.branch-card[data-hop="n1"] .relation-caption').textContent(), /develops this idea/);
+  assert.match(await page.locator('.branch-card[data-hop="n1"] .similarity-caption').textContent(), /Shared #connections/);
+  await page.screenshot({ path: '/tmp/thoughtos-centered-reasons.png' });
+
   // Collection drawer dismisses by Escape and closes after a filter is chosen.
   await page.locator('#toggle-sidebar').click(); assert.equal(await page.locator('#sidebar').isVisible(), true);
   assert.equal(await page.locator('main').evaluate(e => e.inert), true);
