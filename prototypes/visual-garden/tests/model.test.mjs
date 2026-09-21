@@ -49,3 +49,59 @@ test('bad storage data fails validation', () => {
   notes[0].title = '';
   assert.equal(validateNotes(notes), false);
 });
+
+import { migrateNotes, validateGraph, edges, describeLink, renameLink, deriveMetadata, semanticMatches, normalisePrefs } from '../public/model.js';
+test('legacy links migrate once, unnamed, with original note text preserved', () => {
+  const old = freshNotes(); old[1].links.push('n1'); const copy = structuredClone(old);
+  const notes = migrateNotes(old);
+  assert.ok(validateGraph(notes)); assert.deepEqual(old, copy);
+  assert.equal(edges(notes).filter(e => e.source === 'n1' && e.target === 'n2').length, 1);
+  assert.ok(edges(notes).every(e => !e.label && !e.directed));
+  assert.equal(notes[0].body, old[0].body); assert.deepEqual(migrateNotes(notes), notes);
+});
+test('named edges preserve direction, rename from either end, reject duplicate records', () => {
+  let notes = addLink(migrateNotes(freshNotes()), 'n1', 'n20', 'inspires', true);
+  assert.equal(describeLink(notes, 'n1', 'n20'), '→ inspires');
+  assert.equal(describeLink(notes, 'n20', 'n1'), '← inspires');
+  notes = renameLink(notes, 'n20', 'n1', 'challenges', true);
+  assert.equal(describeLink(notes, 'n1', 'n20'), '→ challenges');
+  assert.ok(validateGraph(notes));
+  notes[19].connections.push({ target: 'n1', label: 'contradiction', directed: true });
+  assert.equal(validateGraph(notes), false);
+});
+test('tag syntax is exact and multiple constraints combine, including semantic matches', () => {
+  const notes = freshNotes();
+  assert.equal(filtered(notes, { query: '#thoughtos tag:discovery' }).length, 2);
+  assert.equal(filtered(notes, { query: '#thought' }).length, 0);
+  const vectors = Object.fromEntries(notes.map(n => [n.id, [1, 0]]));
+  const result = semanticMatches(notes, vectors, [1, 0], { query: 'forgotten idea #thoughtos tag:discovery', topic: 'Learning' });
+  assert.deepEqual(result.map(r => r.note.id), ['n19']);
+  assert.deepEqual(semanticMatches(notes, vectors, [0, 1], {}), []);
+});
+test('capture metadata is deterministic and preferences never opt into model/recording', () => {
+  const body = '  # A rough thought\n\n experiments experiments\n  ';
+  const meta = deriveMetadata(body, freshNotes());
+  assert.equal(meta.title, 'A rough thought'); assert.ok(meta.tags.includes('experiments'));
+  assert.equal(normalisePrefs().semantic, false); assert.equal(normalisePrefs().record, false);
+});
+
+import { collectionNames, normaliseCollection, surroundingNotes } from '../public/model.js';
+test('collections grow from assigned notes with normalised names and an unsorted default', () => {
+  const notes = freshNotes();
+  assert.equal(normaliseCollection('  Wardrub  ', notes), 'Wardrub');
+  assert.equal(normaliseCollection('wardrub', notes), 'Wardrub');
+  assert.equal(normaliseCollection('', notes), 'Unsorted');
+  notes[0].topic = normaliseCollection('  Writing   practice ', notes);
+  assert.ok(validateGraph(notes)); assert.ok(collectionNames(notes).includes('Writing practice'));
+  assert.equal(filtered(notes, { topic: 'Writing practice' }).length, 1);
+  notes[0].topic = 'Everyday'; assert.ok(!collectionNames(notes).includes('Writing practice'));
+});
+test('the neighborhood includes every unconnected note, including those with no shared tags', () => {
+  const notes = freshNotes(), before = JSON.stringify(notes);
+  const all = surroundingNotes(notes, 'n3'), unlinked = surroundingNotes(notes, 'n3', { scope: 'unlinked' });
+  assert.equal(all.length, 19); assert.equal(new Set(all.map(x => x.note.id)).size, 19);
+  assert.equal(all[0].linked, false); assert.equal(all[1].linked, true);
+  assert.equal(unlinked.length, 14); assert.ok(unlinked.some(n => !n.tags.length));
+  assert.ok(unlinked.every(n => !n.linked)); assert.equal(JSON.stringify(notes), before);
+  assert.equal(surroundingNotes(notes, 'n3', { scope: 'linked' }).length, 5);
+});

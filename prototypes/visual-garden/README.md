@@ -1,100 +1,92 @@
-# ThoughtOS Thinking Desk — prototype 02
+# ThoughtOS Thinking Desk — prototype 03
 
-Desktop-first Zettel desk with **20 invented sample notes**. The earlier notebook/tablet and constellation/AR directions are parked while the desk's interaction model is polished. No live ThoughtOS/Obsidian/Claude data is loaded into the browser.
+A desktop-first Zettel desk with 20 invented sample notes. No live ThoughtOS, Obsidian or Claude data is loaded. Notebook/tablet and constellation/AR remain separate future directions.
 
-## Open it
+## Run locally
 
-**http://100.76.207.86:4321/** from a Tailscale-connected device.
-
-Temporary user services:
-
-- `thoughtos-visual-tailnet.service`: bound only to `100.76.207.86:4321`.
-- `thoughtos-visual-prototype.service`: loopback preview on `127.0.0.1:4321`.
-
-These are transient units, not enabled boot services. They can be inspected, restarted or stopped with `systemctl --user`. Logs: `journalctl --user -u thoughtos-visual-tailnet -n 30`.
-
-HTTPS configuration required sudo and was not changed. Existing OpenClaw HTTPS routing remains untouched. Tailscale encrypts transport to the private IP. Do not publish/Funnel private note data.
-
-Mac fallback while the loopback preview runs:
+Node 20+, no npm runtime dependencies or build step:
 
 ```sh
-ssh -N -L 4321:127.0.0.1:4321 hardik@100.76.207.86
-# Open http://127.0.0.1:4321 on the Mac.
-```
-
-## Run manually
-
-Node 20+; no runtime dependencies, build step, model or API key:
-
-```sh
-cd ~/Projects/ThoughtOS/prototypes/visual-garden
+cd prototypes/visual-garden
 npm start
-# Or bind only to this home server's private Tailscale address:
-HOST=100.76.207.86 npm start
+# http://127.0.0.1:4321
 ```
 
-Stop the matching existing service before starting another listener on the same address/port. `PORT` defaults to 4321. Serve only `public/`, never the repository root.
+`HOST` and `PORT` select the listener. Only bind to loopback or an explicitly selected private Tailscale address; this sample prototype has no production authentication. Serve only the allowlisted public assets, never the repository root.
 
-## Main interactions
+Optional local meaning search:
 
-1. **Open:** click a card's title/body to read it in the side pane.
-2. **Edit / Tags:** visible actions in the reader and on cards. Tags have add/remove chips and reusable suggestions. Press Enter or comma to add; save the note to commit. Tags group/filter; they are not explicit links.
-3. **Connect:** click Connect on any card. The chooser names the source card, searches all notes, excludes self/existing links, and previews matches. Select a match to create one undirected connection, visible on both cards. “Write a new thought and connect it” creates both in one undoable edit.
-4. **Explore chain:** focus a thought between all its explicit connections. Click any neighbour to take another branch. A persistent breadcrumb trail has Back/Forward; taking a new branch discards forward navigation. Dotted breadcrumb separators mean a jump, not a link.
-5. **Another angle:** suggestions based only on shared tags. Clearly marked NOT LINKED; viewing them does not create connections. Connect is a separate explicit action.
-6. **Find:** searches across all collections, independently of desk filters. Arrow keys and Enter select a result. Opening a result enters chain exploration.
-7. **Filter:** collection, word cloud and text filters combine on the desk. Chain exploration is global; it retains those filters for your return to All cards.
-8. **Undo / Reset:** undo the last 30 data changes during this visit, or reset the demo with confirmation.
+```sh
+ollama pull nomic-embed-text
+ENABLE_SEMANTIC=1 npm start
+```
 
-List is retained as a simple accessible alternative. Notebook and constellation are no longer in the active view switcher.
+Enable **local meaning matches** in Find or Settings. Note text and query text are sent only to the fixed local Ollama instance on the machine running the server. CPU inference is requested; no cloud API or key is used. Without the model, text/tag search stays available. Find uses the documented [Ollama embedding endpoint](https://docs.ollama.com/api/embed).
+
+The previously recorded home-server URL is `http://100.76.207.86:4321/`. The local iteration-03 edits do **not** update that deployment. The existing transient user units are `thoughtos-visual-tailnet.service` and `thoughtos-visual-prototype.service`; this iteration did not change them. Do not publish/Funnel private notes. Existing HTTPS/OpenClaw routing is untouched.
+
+## Desk interactions
+
+The main surface starts with notes beneath a single toolbar. Collections are in a collapsed drawer (☰ or B); snapshots, settings, undo and help are in the ••• menu.
+
+- **Collections grow from notes:** use an existing collection name or type a new one in the editor. “Start a collection” opens its first note. The collection appears after saving, and its count grows as more notes use that name. Unassigned captures go to Unsorted. No empty collection is created by cancelling a draft.
+- **Word cloud:** a separate, full-width browsing surface with weighted type, colour and slight rotations. Larger words appear in more notes. Click a word to see its matching notes below. Every tag remains reachable; above 60 tags, the remainder is accessible through the full tag list.
+
+- **Read when needed:** click a card; close the reader with Close or Escape. Chain view offers “Read full thought”. Compact and comfortable card density are in Settings.
+- **Capture:** New thought starts in freeform mode. Write the original text, optionally accept a suggested title/tag, or expand the details. Structured mode exposes title and metadata. Switching modes preserves the draft. Suggestions use first-line/keyword rules, not generated prose; original body whitespace is saved unchanged.
+- **Connect:** every card has Connect. Choose another thought, optionally name why they relate, and mark direction if it matters. Both endpoints show the same relationship; Name in the reader edits it. Old links stay unnamed until reviewed.
+- **Explore:** the complete thought sits beside all other notes, with unconnected notes in the first row. Switch between All, Unconnected and Connected. Shared tags/local meaning influence order, but notes with no similarity remain available. Opening or reading one never creates a link. Back/Forward and breadcrumbs preserve the trail.
+- **Find:** globally searches title/text and exact tags (`#tag`, `tag:name`), independently of desk filters. Multiple tags combine. Optional meaning matches follow exact matches, preserve tag constraints and are explicitly labelled. Desk filtering itself remains text/tag based.
+- **Arrange:** recent, collection, or similar thoughts around the last selected note. Similar uses local vectors when available and shared tags otherwise.
+- **Snapshots:** name the current experiment, restore one, restore its safety copy to go back, or delete a snapshot. Notes, named edges and desk preferences are included. Current model/recording consent is kept during restore.
+- **Recording:** Settings can opt into completed-edit snapshots. No draft/keystroke recording. Keeps 20 automatic and 20 safety copies; up to 50 manual snapshots remain until deleted. Snapshots are local to this browser/address and are removed by clearing its storage.
+- **Undo / reset:** undo the last 30 note/connection changes this visit. Reset requires confirmation and resets the sample desk while keeping snapshots.
 
 ## Keyboard
 
 | Keys | Action |
 |---|---|
-| Cmd/Ctrl+F, Cmd/Ctrl+K, or `/` | Find globally |
+| B | Open / close collections |
 | N | New thought |
-| Cmd/Ctrl+N | New thought only when the browser delivers this event to the page |
+| Cmd/Ctrl+N | New thought when the browser delivers this reserved shortcut |
+| F, Cmd/Ctrl+F, Cmd/Ctrl+K, `/` | Find globally |
 | E / T / C / X | Edit / Tags / Connect / Explore selected thought |
-| Arrow keys + Enter | Move between cards, then open |
-| Alt+Left / Alt+Right | Back / Forward in the thought trail |
-| Cmd/Ctrl+S | Save the open editor |
-| Escape | Close a dialog without saving |
-| ? | Instructions and shortcut reference |
+| Arrows + Enter | Move between cards, then open |
+| Alt+Left / Alt+Right | Back / Forward in the trail |
+| Cmd/Ctrl+S | Save open note editor |
+| Escape | Close dialog/reader; discard unsaved dialog draft |
+| ? | Help |
 
-**Browser limitation:** Cmd/Ctrl+N is reserved by many browsers for a new window. A web page cannot reliably override browser/OS shortcuts. N outside an input and the visible New thought button remain reliable. Supporting native Cmd+N everywhere would require a desktop-app shell or another platform integration. Automated key events are not proof of OS-level interception.
+Plain-letter shortcuts never intercept typing. Browsers may reserve Cmd/Ctrl+N for a new window; use N or the visible button as a reliable fallback. Native editor undo is preserved.
 
-Plain-letter shortcuts never trigger in text inputs or editable fields. Native text-editor undo is not overridden.
+## Storage and boundaries
 
-## Data / privacy boundary
+The `thoughtos.visual-garden.v1` localStorage key now contains `{ version: 2, notes }`. Version-1 edits migrate in memory and are backed up to `.pre-v3` before the first write. Existing malformed data is reported and left untouched. Failed saves retain the in-memory edit with a warning.
 
-Notes and links use browser `localStorage`, key `thoughtos.visual-garden.v1`. Version 02 preserves the version-01 data shape and existing saved edits. Each browser/origin has its own copy: the tailnet and SSH-tunnel URLs do not share edits. No backend writes or cross-device sync occur.
+Each pair has one source-owned `connections` entry `{ target, label, directed }`; legacy string `links` become empty after migration. Both endpoints read the same record, so reverse traversal cannot invent or desynchronise a second label.
 
-Malformed saved data is preserved and reported, not overwritten. Save failures leave edits in memory with a warning. Reset clears only the prototype storage key. View, filters, trail and undo history are session-local.
+Preferences and snapshots use separate localStorage keys. No SQLite database is opened. `experiment_store.py` is an unused earlier draft, not an active API. Restoring requires a successfully saved recovery copy. Browser-only storage is not a durable or cross-device backup.
 
-The server allowlists seven public assets, rejects writes, and cannot serve `.env`, SQLite or repository files. No external fonts, analytics or runtime libraries are loaded. Network access follows tailnet policy; this is not a production-authenticated personal vault. The Sources dialog describes possible adapters, not functioning integrations.
+The server allowlists public assets. `/api/semantic` is the only POST endpoint, disabled by default, requiring matching Origin/Host and JSON requests. It bounds request/batch sizes and connects only to a fixed loopback model. No repository files, canonical notes, source adapters, external fonts, analytics or cloud services are exposed.
 
 ## Tests
 
 ```sh
 npm test
+
+# Set these to your installed Playwright and Chrome paths as needed.
+PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
+CHROME_PATH=/path/to/chrome \
+PROTOTYPE_URL=http://127.0.0.1:4321 node tests/browser.mjs
+
+# Requires ENABLE_SEMANTIC=1 server and local nomic-embed-text model.
+PLAYWRIGHT_MODULE=/path/to/playwright/index.mjs \
+CHROME_PATH=/path/to/chrome \
+PROTOTYPE_URL=http://127.0.0.1:4321 node tests/iteration03.mjs
 ```
 
-Six unit tests cover data validation, filters, reciprocal links, tag counts, suggestion separation and invalid storage.
+Run `tests/feedback.mjs` with the same browser environment to check the five browser-feedback changes, including growing collections, all unconnected notes, word-cloud overlap, and mobile layouts.
 
-Browser tests use an existing Playwright installation (not a runtime dependency):
+Screenshots are written to `/tmp/thoughtos-*-v3.png`. See `ITERATION_03.md` for implementation status, validation and limitations; `DESK_DIRECTION.md` for source-readiness notes.
 
-```sh
-PLAYWRIGHT_MODULE=/home/hardik/Projects/wardrub/frontend/node_modules/playwright/index.mjs \
-CHROME_PATH=/usr/bin/google-chrome \
-PROTOTYPE_URL=http://100.76.207.86:4321 \
-node tests/browser.mjs
-```
-
-Paths can be replaced by another installed Playwright/Chrome; without `PLAYWRIGHT_MODULE`, the test imports `playwright`. Tests verify desktop/mobile layout, a connection from an unselected card, searchable/keyboard chooser, reciprocal links, new connected notes, branch/back/forward, tags, global Cmd/Ctrl search, editor save shortcuts, ordinary typing, persistence, sanitization, undo, reset, corrupt storage and server isolation. Screenshots go to `/tmp/thoughtos-{desk,chain,connect,mobile-chain}-v2.png`.
-
-## Source inventory and next step
-
-See [`DESK_DIRECTION.md`](DESK_DIRECTION.md) for the user's platform direction and the read-only source inventory. Enough real notes exist to start, but entity relationships are not equivalent to explicit note links. Next integration should be a scoped, read-only ThoughtOS preview with provenance, then an explicitly selected Obsidian vault/export. Do not silently import all chat histories or convert task records into scheduled reminders.
-
-Not implemented: live source adapters, sync, reminder scheduling, drag/stack layouts, handwriting, attachments, AI inference or production authentication.
+Not implemented: real-source adapters/imports, cross-device sync, durable server snapshots, reminder scheduling, drag/stack layouts, handwriting, attachments or production authentication.

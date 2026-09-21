@@ -34,14 +34,14 @@ export function validateNotes(notes) {
   return ids.size === notes.length && notes.every(n => n &&
     typeof n.id === 'string' && n.id.length > 0 && n.id.length < 100 &&
     typeof n.title === 'string' && n.title.trim().length > 0 && n.title.length <= 120 &&
-    typeof n.body === 'string' && n.body.length <= 20000 && TOPICS.includes(n.topic) &&
+    typeof n.body === 'string' && n.body.length <= 20000 && typeof n.topic === 'string' && n.topic.trim().length > 0 && n.topic.length <= 60 &&
     typeof n.aside === 'string' && typeof n.createdAt === 'string' &&
     Array.isArray(n.tags) && n.tags.length <= 12 && n.tags.every(t => typeof t === 'string' && t.length <= 40) &&
     Array.isArray(n.links) && n.links.every(id => ids.has(id) && id !== n.id));
 }
 export function related(notes, id) {
-  const note = notes.find(n => n.id === id);
-  return note ? notes.filter(n => n.id !== id && (note.links.includes(n.id) || n.links.includes(id))) : [];
+  const ids = new Set(edges(notes).filter(e => e.source === id || e.target === id).flatMap(e => [e.source, e.target]));
+  return notes.filter(n => n.id !== id && ids.has(n.id));
 }
 export function parseSearch(query = '') {
   const tags = [];
@@ -57,13 +57,14 @@ export function filtered(notes, { query = '', topic = '', tag = '' } = {}) {
       search.tags.every(t => tags.includes(t)) && search.words.every(word => haystack.includes(word));
   });
 }
-export const DEFAULT_PREFS = { compose: 'freeform', density: 'compact', semantic: true, arrange: 'meaning' };
+export const DEFAULT_PREFS = { compose: 'freeform', density: 'compact', semantic: false, arrange: 'recent', record: false };
 export function normalisePrefs(p = {}) {
   return {
     compose: p.compose === 'structured' ? 'structured' : 'freeform',
     density: p.density === 'comfortable' ? 'comfortable' : 'compact',
-    semantic: typeof p.semantic === 'boolean' ? p.semantic : true,
-    arrange: ['meaning', 'collection', 'recent'].includes(p.arrange) ? p.arrange : 'meaning',
+    semantic: p.semantic === true,
+    record: p.record === true,
+    arrange: ['meaning', 'collection', 'recent'].includes(p.arrange) ? p.arrange : 'recent',
   };
 }
 const STOP_WORDS = new Set('a an the and or but for to of in on at by with from as is are was were be been being it its this that these those i we you they he she my our your their me us them have has had do does did can could would should will just very more most less some any all not no also into about through how what when where why who maybe need want feel think use using used then than like so if there here new'.split(' '));
@@ -84,10 +85,40 @@ export function topicsCloud(notes) {
   for (const note of notes) for (const tag of new Set(note.tags)) counts.set(tag, (counts.get(tag) || 0) + 1);
   return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
-export function addLink(notes, source, target) {
+export function collectionNames(notes) {
+  return [...new Set(notes.map(n => n.topic))].sort((a, b) => a.localeCompare(b));
+}
+export function normaliseCollection(value, notes = []) {
+  const name = value.trim().replace(/\s+/g, ' ') || 'Unsorted';
+  return collectionNames(notes).find(t => t.toLocaleLowerCase() === name.toLocaleLowerCase()) || name;
+}
+
+// Browsing is not limited to explicit edges or model confidence. Every other note
+// remains reachable; similarity is a sorting hint, never an invented relationship.
+export function surroundingNotes(notes, id, { scope = 'all', vectors = {} } = {}) {
+  const source = notes.find(n => n.id === id);
+  if (!source) return [];
+  const linkedIds = new Set(related(notes, id).map(n => n.id));
+  const items = notes.filter(n => n.id !== id).map(note => {
+    const tags = note.tags.filter(t => source.tags.includes(t));
+    const score = cosine(vectors[id], vectors[note.id]);
+    return { note, linked: linkedIds.has(note.id), tags, semantic: score > .35, score };
+  }).sort((a, b) => b.score - a.score || b.tags.length - a.tags.length || a.note.title.localeCompare(b.note.title));
+  const linked = items.filter(n => n.linked), unlinked = items.filter(n => !n.linked);
+  if (scope === 'linked') return linked;
+  if (scope === 'unlinked') return unlinked;
+  const result = [];
+  for (let i = 0; i < Math.max(linked.length, unlinked.length); i++) {
+    if (unlinked[i]) result.push(unlinked[i]);
+    if (linked[i]) result.push(linked[i]);
+  }
+  return result;
+}
+export function addLink(notes, source, target, label = '', directed = false) {
   if (source === target || !notes.some(n => n.id === source) || !notes.some(n => n.id === target)) return notes;
   if (related(notes, source).some(n => n.id === target)) return notes;
-  return notes.map(n => n.id === source ? { ...n, links: [...n.links, target] } : n);
+  if (typeof label !== 'string' || label.trim().length > 160) return notes;
+  return notes.map(n => n.id === source ? { ...n, connections: [...(n.connections || []), { target, label: label.trim(), directed: Boolean(directed) }] } : n);
 }
 // Shared tags suggest a direction; they never silently create a link.
 export function suggestions(notes, id, limit = 6) {
@@ -102,5 +133,55 @@ export function suggestions(notes, id, limit = 6) {
 }
 export function removeLink(notes, source, target) {
   return notes.map(n => n.id === source || n.id === target
-    ? { ...n, links: n.links.filter(id => id !== (n.id === source ? target : source)) } : n);
+    ? { ...n, links: n.links.filter(id => id !== (n.id === source ? target : source)), connections: (n.connections || []).filter(e => e.target !== (n.id === source ? target : source)) } : n);
+}
+
+// One authoritative record per pair. Legacy links remain unnamed and undirected.
+export function edges(notes) {
+  const result = [], seen = new Set();
+  for (const n of notes) for (const e of [...(n.connections || []), ...n.links.map(target => ({ target, label: '', directed: false }))]) {
+    const key = JSON.stringify([n.id, e.target].sort());
+    if (!seen.has(key)) { seen.add(key); result.push({ source: n.id, ...e }); }
+  }
+  return result;
+}
+export function migrateNotes(notes) {
+  const records = edges(notes);
+  return notes.map(n => ({ ...structuredClone(n), links: [], connections: records.filter(e => e.source === n.id).map(({ source, ...e }) => e) }));
+}
+export function validateGraph(notes) {
+  if (!validateNotes(notes)) return false;
+  const ids = new Set(notes.map(n => n.id)), pairs = new Set();
+  const legacyPairs = new Set(notes.flatMap(n => n.links.map(target => JSON.stringify([n.id, target].sort()))));
+  return notes.every(n => n.connections === undefined || (Array.isArray(n.connections) && n.connections.length <= 499 && n.connections.every(e => {
+    if (!e || !ids.has(e.target) || e.target === n.id || typeof e.label !== 'string' || e.label.length > 160 || typeof e.directed !== 'boolean') return false;
+    const pair = JSON.stringify([n.id, e.target].sort());
+    if (pairs.has(pair) || legacyPairs.has(pair)) return false;
+    pairs.add(pair); return true;
+  })));
+}
+export function describeLink(notes, from, to) {
+  const edge = edges(notes).find(e => (e.source === from && e.target === to) || (e.target === from && e.source === to));
+  if (!edge) return '';
+  const label = edge.label || 'Unnamed connection';
+  return `${edge.directed ? edge.source === from ? '→ ' : '← ' : edge.label ? '↔ ' : ''}${label}`;
+}
+export function renameLink(notes, from, to, label, directed) {
+  const graph = migrateNotes(notes);
+  return graph.map(n => ({ ...n, connections: n.connections.map(e =>
+    (n.id === from && e.target === to) || (n.id === to && e.target === from)
+      ? { ...e, label: label.trim().slice(0, 160), directed: Boolean(directed) } : e) }));
+}
+export function cosine(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || !a.length) return 0;
+  let dot = 0, aa = 0, bb = 0;
+  for (let i = 0; i < a.length; i++) { dot += a[i] * b[i]; aa += a[i] ** 2; bb += b[i] ** 2; }
+  return aa && bb ? dot / Math.sqrt(aa * bb) : 0;
+}
+export function semanticMatches(notes, vectors, queryVector, filters = {}) {
+  const { tags } = parseSearch(filters.query);
+  // Tags and collection are always hard constraints, even for vector search.
+  return filtered(notes, { ...filters, query: tags.map(t => `#${t}`).join(' ') })
+    .map(note => ({ note, score: cosine(vectors[note.id], queryVector) }))
+    .filter(item => item.score > 0.35).sort((a,b) => b.score - a.score);
 }
