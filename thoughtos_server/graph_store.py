@@ -117,8 +117,9 @@ CREATE INDEX IF NOT EXISTS idx_ext_state_hash ON note_extraction_state(rule_hash
 class GraphStore:
     """SQLite-backed graph store for entities, relationships, and extraction rules."""
 
-    def __init__(self, db_path: str = "context_os.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        from .paths import database_path
+        self.db_path = database_path(db_path)
 
     def _conn(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)

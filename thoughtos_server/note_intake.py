@@ -23,6 +23,7 @@ except ImportError:
 from .config import ExtractionConfig, load_config
 from .graph_store import GraphStore
 from .extractor import ExtractionPipeline
+from .paths import database_path, using_database
 
 
 def intake_note(
@@ -33,7 +34,7 @@ def intake_note(
     context: Optional[Dict[str, Any]] = None,
     extract_entities: bool = True,
     config: Optional[ExtractionConfig] = None,
-    db_path: str = "context_os.db",
+    db_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Capture a note, standardize it, extract entities, store everything.
 
@@ -50,14 +51,18 @@ def intake_note(
     Returns:
         Dict with 'note', 'tasks', 'structured', and optionally 'extraction'.
     """
-    # Step 1: Standardize via existing logic
-    result = _original_intake_note(
-        user_id=user_id,
-        text=text,
-        source=source,
-        note_type=note_type,
-        context=context,
-    )
+    # Explicit per-call overrides must apply to notes/tasks AND the graph.
+    db_path = database_path(db_path)
+    from logic.sql_engine import init_db
+    with using_database(db_path):
+        init_db()
+        result = _original_intake_note(
+            user_id=user_id,
+            text=text,
+            source=source,
+            note_type=note_type,
+            context=context,
+        )
 
     # Step 2: Extract entities & relationships
     if extract_entities:
@@ -90,7 +95,7 @@ def rerun_extraction_for_note(
     note_text: str,
     user_id: str,
     config: Optional[ExtractionConfig] = None,
-    db_path: str = "context_os.db",
+    db_path: Optional[str] = None,
     llm_provider: Optional[str] = None,
     llm_model: Optional[str] = None,
 ) -> Dict[str, Any]:
@@ -120,7 +125,7 @@ def rerun_extraction_for_note(
 def rerun_all_extractions(
     user_id: str,
     config: Optional[ExtractionConfig] = None,
-    db_path: str = "context_os.db",
+    db_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Re-run extraction on all notes for a user."""
     import sqlite3
@@ -130,7 +135,7 @@ def rerun_all_extractions(
     graph.init()
 
     # Get all notes with their text
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(graph.db_path)
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(

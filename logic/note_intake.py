@@ -7,6 +7,7 @@ clients should call into this module/API instead of duplicating note logic.
 from __future__ import annotations
 
 import json
+import os
 import re
 import uuid
 from datetime import datetime
@@ -167,6 +168,8 @@ def _fallback_standardize(text: str, note_type: str) -> Dict[str, Any]:
 
 
 def _try_llm_standardize(text: str, note_type: str) -> Optional[Dict[str, Any]]:
+    if os.getenv('THOUGHTOS_LLM_ENABLED', '1') == '0':
+        return None
     prompt = f"""
 You are ThoughtOS note intake. Convert rough notes into structured JSON.
 Preserve the user's meaning. Do not invent facts. Extract concrete tasks only.

@@ -2,6 +2,7 @@ import google.generativeai as genai
 import numpy as np
 import sqlite3
 import os
+from thoughtos_server.paths import database_path
 
 # Configure Gemini API
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
@@ -26,7 +27,7 @@ def find_similar_transactions(merchant_name, limit=5):
     if query_embedding is None:
         return []
     
-    conn = sqlite3.connect("context_os.db")
+    conn = sqlite3.connect(database_path())
     conn.row_factory = sqlite3.Row
     
     # Get all transactions with embeddings and categories
@@ -70,7 +71,7 @@ def store_embedding(txn_id, merchant_name):
     if embedding is None:
         return False
     
-    conn = sqlite3.connect("context_os.db")
+    conn = sqlite3.connect(database_path())
     cursor = conn.cursor()
     
     try:

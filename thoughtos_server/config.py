@@ -6,6 +6,7 @@ Reads from environment variables with sensible defaults.
 import os
 from dataclasses import dataclass, field
 from typing import Optional
+from .paths import database_path
 
 
 @dataclass
@@ -43,7 +44,7 @@ class ExtractionConfig:
 @dataclass
 class Config:
     """Top-level ThoughtOS configuration."""
-    db_path: str = "context_os.db"
+    db_path: str = field(default_factory=database_path)
     host: str = "0.0.0.0"
     port: int = 8000
     extraction: ExtractionConfig = field(default_factory=ExtractionConfig)
@@ -56,7 +57,7 @@ def load_config() -> Config:
     # Server
     config.host = os.getenv("THOUGHTOS_HOST", "0.0.0.0")
     config.port = int(os.getenv("THOUGHTOS_PORT", "8000"))
-    config.db_path = os.getenv("THOUGHTOS_DB_PATH", "context_os.db")
+    config.db_path = database_path()
 
     # Extraction LLM
     ext = config.extraction
